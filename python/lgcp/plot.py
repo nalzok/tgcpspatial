@@ -1,19 +1,31 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
 """
-Plotting helpers copied from 
-``neurotools.graphics.plot``, and some new 
+Plotting helpers copied from
+``neurotools.graphics.plot``, and some new
 routines to reduce notebook clutter.
 """
+
+from math import ceil
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
-from matplotlib.pyplot import (axhline, axis, draw, figure, gca, gcf, imshow,
-                               legend, plot, sca, subplot, subplots_adjust,
-                               suptitle, text, title, xlabel, xlim, xticks,
-                               ylabel, ylim, yticks)
+from matplotlib.pyplot import (
+    axis,
+    figure,
+    legend,
+    sca,
+    subplot,
+    subplots_adjust,
+    suptitle,
+    title,
+    xlim,
+    ylim,
+)
+
+from .util import c2p, p2c
 
 # Some custom colors, just for fun! 
 WHITE      = np.float32(mpl.colors.to_rgb('#f1f0e9'))
@@ -143,12 +155,12 @@ def right_legend(*args,fudge=0.0,**kwargs):
     lg = legend(*args,**defaults)
     lg.get_frame().set_linewidth(0.0)
     return lg
-def xticklen(l=0,w=None,ax=None,which='both',**kwargs):
+def xticklen(length=0,w=None,ax=None,which='both',**kwargs):
     if ax is None: ax = plt.gca()
-    ax.xaxis.set_tick_params(length=l, width=w, which=which, **kwargs)
-def yticklen(l=0,w=None,ax=None,which='both',**kwargs):
+    ax.xaxis.set_tick_params(length=length, width=w, which=which, **kwargs)
+def yticklen(length=0,w=None,ax=None,which='both',**kwargs):
     if ax is None: ax = plt.gca()
-    ax.yaxis.set_tick_params(length=l, width=w, which=which, **kwargs)
+    ax.yaxis.set_tick_params(length=length, width=w, which=which, **kwargs)
 def noclip(ax=None):
     if ax is None: ax = plt.gca()
     for o in ax.findobj(): o.set_clip_on(False)
@@ -266,7 +278,7 @@ def inference_summary_plot(
     ftitle        = '',
     cmap          = 'bone_r',
     ax            = None,
-    caxprops      = dict(fontsize=8,vscale=0.5,width=10),
+    caxprops      = None,
     titlesize     = 10,
     draw_scalebar = True
     ):
@@ -288,6 +300,8 @@ def inference_summary_plot(
         Figure title
     '''
     from lgcpspatial.lgcp2d import LGCPResult
+    if caxprops is None:
+        caxprops = dict(fontsize=8, vscale=0.5, width=10)
     if isinstance(model, LGCPResult):
         data  = model.data
         fit   = model.fit
@@ -315,7 +329,7 @@ def inference_summary_plot(
     cv = σλ/μλ
     
     if isinstance(cmap,str):
-        cmap = matplotlib.pyplot.get_cmap(cmap)
+        cmap = mpl.pyplot.get_cmap(cmap)
     
     if ax is None:
         figure(figsize=(9,2.5),dpi=120)
@@ -335,7 +349,7 @@ def inference_summary_plot(
     vmin,vmax = np.nanpercentile(toshow,[1,97.5])
     vmin = np.floor(vmin*10)/10
     vmax = ceil (vmax*10)/10
-    im = plt.imshow(y*Fs,vmin=vmin,vmax=vmax,cmap=cmap,extent=extent)
+    plt.imshow(y*Fs,vmin=vmin,vmax=vmax,cmap=cmap,extent=extent)
     title('Rate histogram',pad=0,fontsize=titlesize)
     axis('off')
     
@@ -349,7 +363,7 @@ def inference_summary_plot(
     # Add color bar with marker for neurons mean-rate
     cax[1] = good_colorbar(vmin,vmax,title='Hz',cmap=cmap,**caxprops)
     sca(cax[1])
-    μy = np.mean(y[mask])*Fs
+    np.mean(y[mask])*Fs
     #axhline(μy,color='w',lw=0.8)
     #text(xlim()[1]+.6,μy,r'$\langle y \rangle$:%0.2f Hz'%μy,va='center',fontsize=7)
 
@@ -374,7 +388,7 @@ def inference_summary_plot(
     vmax += (vmax-vmin)*.2
     vmin = np.floor(vmin*10)/10
     vmax = ceil (vmax*10)/10
-    im = plt.imshow(
+    plt.imshow(
         toshow,
         vmin=vmin,
         vmax=vmax,
@@ -390,7 +404,7 @@ def inference_summary_plot(
     vmin,vmax = np.nanpercentile(toshow,[.5,99.5])
     vmin = np.floor(vmin*100)/100
     vmax = ceil (vmax*100)/100
-    im = plt.imshow(
+    plt.imshow(
         toshow,
         vmin=vmin,
         vmax=vmax,
@@ -409,7 +423,7 @@ def unit_crosshairs(draw_ellipse=True,draw_cross=True):
     if draw_ellipse:
         circle = np.exp(1j*np.linspace(0,2*np.pi,361))
         lines += list(circle)
-    if draw_cross==True:
+    if draw_cross:
         lines += [np.nan]+list(1.*np.linspace(-1,-.4,2))
         lines += [np.nan]+list(1j*np.linspace(-1,-.4,2))
         lines += [np.nan]+list(1.*np.linspace( 1, .4,2))
@@ -504,10 +518,10 @@ def good_colorbar(vmin=None,
     fontsize=10,
     vscale=1.0,
     va='c'):
-    '''
-    Matplotlib's colorbar function is pretty bad. 
+    r'''
+    Matplotlib's colorbar function is pretty bad.
     This is less bad.
-    r'$\mathrm{\mu V}^2$'
+    Example: r'$\mathrm{\mu V}^2$'
 
     Parameters:
         vmin: scalar
@@ -547,7 +561,7 @@ def good_colorbar(vmin=None,
         axis: colorbar axis
     
     '''
-    if type(vmin)==mpl.image.AxesImage:
+    if isinstance(vmin, mpl.image.AxesImage):
         img  = vmin
         cmap = img.get_cmap()
         vmin = img.get_clim()[0]
@@ -559,7 +573,7 @@ def good_colorbar(vmin=None,
     CWIDTH  = px2xf(width,ax=ax)
     # manually add colorbar axes 
     bb = ax.get_position()
-    x,y,w,h = bb.xmin,bb.ymin,bb.width,bb.height
+    _x,_y,_w,h = bb.xmin,bb.ymin,bb.width,bb.height
     r,b = bb.xmax,bb.ymax
     y0 = {
         'b':lambda:b-h,
@@ -612,7 +626,7 @@ def colored_boxplot(
     notch       = False,
     showfliers  = False,
     lw          = 1,
-    whis        = [5,95],
+    whis        = None,
     bgcolor     = WHITE,
     mediancolor = None,
     **kwargs):
@@ -648,17 +662,19 @@ def colored_boxplot(
     **kwargs:
         Additional arguments fowarded to ``pyplot.boxplot()``
     '''
+    if whis is None:
+        whis = [5, 95]
     if 'linewidth' in kwargs:
-        lw = kwargs[linewidth]
-    b = matplotlib.colors.to_hex(BLACK)
+        lw = kwargs['linewidth']
+    b = mpl.colors.to_hex(BLACK)
     if mediancolor is None:
         try:
             mediancolor = [
-                BLACK if matplotlib.colors.to_hex(c)!=b \
+                BLACK if mpl.colors.to_hex(c)!=b \
                 else WHITE for c in color]
-        except:
+        except Exception:
             mediancolor = BLACK \
-                if matplotlib.colors.to_hex(color)!=b \
+                if mpl.colors.to_hex(color)!=b \
                 else WHITE
     bp = plt.boxplot(data,
         positions    = positions,
@@ -672,5 +688,5 @@ def colored_boxplot(
         capprops     = {'linewidth':lw,'color':color},
         boxprops     = {'linewidth':lw,'color':color,
                   'facecolor':color if filled else bgcolor},
-        **kwargs);
+        **kwargs)
     return bp

@@ -6,6 +6,8 @@ Resolution for the camera used to record R1 is 350px/m;
 resolution for other rats (R11 and R18) was 338px/m
 Fs = 50.0 # Sample rate of data (samples/second)
 """
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.pyplot import plot, ylim
@@ -14,10 +16,26 @@ from scipy.special import jn_zeros
 
 from .plot import noxyaxes
 from .sg import SGdifferentiate, SGsmooth
-from .util import (bin_spikes, c2p, extend_mask, fft_acorr, fftfreqn,
-                   is_in_hull, kde, mask_to_qhull, nan_mask, ndbroadcast, p2c,
-                   patch_position_data, pdist, points_to_qhull, qhull_to_mask,
-                   racperiod, sdiv, slog)
+from .util import (
+    bin_spikes,
+    c2p,
+    extend_mask,
+    fft_acorr,
+    fftfreqn,
+    is_in_hull,
+    kde,
+    mask_to_qhull,
+    nan_mask,
+    ndbroadcast,
+    p2c,
+    patch_position_data,
+    pdist,
+    points_to_qhull,
+    qhull_to_mask,
+    racperiod,
+    sdiv,
+    slog,
+)
 
 
 class Arena:
@@ -34,7 +52,7 @@ class Arena:
         # Geometry of arena in meters
         minx,maxx = np.nanmin(x),np.nanmax(x)
         miny,maxy = np.nanmin(y),np.nanmax(y)
-        midx,midy = (minx+maxx)/2.0, (miny+maxy)/2.0;
+        midx,midy = (minx+maxx)/2.0, (miny+maxy)/2.0
         w,h       = maxx-minx,maxy-miny
         # Add padding
         self.margin=margin
@@ -94,7 +112,7 @@ class Arena:
         self.wh     = np.float32([w2,h2])
         self.aspect = w2/h2
         if not (W-1)/H<=self.aspect<=(W+1)/H: raise ValueError((
-            'Data have aspect w/h=%f but W/H=%d/%H=%f;')%(self.aspect,W,H,W/H))
+            'Data have aspect w/h=%f but W/H=%d/%d=%f;')%(self.aspect,W,H,W/H))
         # Convert animal's path to [0,1] coordinates
         self.nx=(x-x0)/w2
         self.ny=(y-y0)/h2
@@ -201,10 +219,8 @@ class Dataset:
     def from_file(fn):
         '''Load a dataset from disk.'''
         data = loadmat(fn,squeeze_me=True)
-        for varname in (
-            'xy dir pos_sample_rate pixels_per_m '
-            'spikes_times spk_sample_rate').split():
-            if not varname in data: raise ValueError(
+        for varname in ['xy', 'dir', 'pos_sample_rate', 'pixels_per_m', 'spikes_times', 'spk_sample_rate']:
+            if varname not in data: raise ValueError(
                 'No variable "%s" in file %s.'%(varname,fn))
         xy_position_px       = data['xy']
         head_direction_deg   = data['dir']
@@ -214,7 +230,7 @@ class Dataset:
         spike_sample_rate    = data['spk_sample_rate']
         if len(spike_times_samples)==0:
             warnings.warn('The `spikes_times` variable '
-                'for file %s appears to be empty.'%fn)
+                'for file %s appears to be empty.'%fn, stacklevel=2)
         # Convert units
         dt                  = 1 / position_sample_rate
         xy_position_meters  = xy_position_px / px_per_meter 

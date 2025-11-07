@@ -7,7 +7,7 @@ import numpy as np
 from numpy.fft import fft, fftn, ifftn
 from scipy.sparse.linalg import LinearOperator, minres
 
-from .util import chinv, outerslice, sdiv, sexp, slog, ssum
+from .util import chinv, ndouter, outerslice, sdiv, sexp, slog, ssum
 
 
 def coordinate_descent(μ,v,
@@ -20,7 +20,7 @@ def coordinate_descent(μ,v,
     alpha       = 1.0,
     verbose     = False):
     say = print if verbose else lambda *a:None
-    for j in range(maxiter):
+    for _j in range(maxiter):
         for i in range(maxmeaniter):
             dμ = meanupdate(μ,v)
             εμ = np.max(abs(dμ))

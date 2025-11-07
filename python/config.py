@@ -8,23 +8,19 @@ Matplotlib and numpy configuration
 import os
 import sys
 
+import matplotlib as mpl
+import numpy as np
+
 path = os.getcwd().split(os.sep)
 while len(path) and path[-1]!='notebooks': path = path[:-1]
 sys.path.append(os.sep.join(path[:-1]))
 datadir = os.sep.join(["krupic2018"])+os.sep
 datafiles = sorted([
-    f for f in os.listdir(datadir) 
+    f for f in os.listdir(datadir)
     if f.startswith('r') and f.endswith('.mat')])
 print('Available files:\n\t'+'\n\t'.join(datafiles))
 fitdir = os.sep.join(path+['hyperparameter_fits',''])
 print('Fitted models in fitdir =',fitdir)
-
-
-
-import pickle
-
-import matplotlib as mpl
-import numpy as np
 
 # Fonts
 SMALL  = 7
@@ -60,8 +56,8 @@ def configure_pylab():
     mpl.rcParams['ytick.minor.size'] = tl
     np.seterr(all='ignore')
     np.set_printoptions(precision=10)
-    np.seterr(divide='ignore', invalid='ignore');
-configure_pylab();
+    np.seterr(divide='ignore', invalid='ignore')
+configure_pylab()
 
 
 # Heading plot configuration

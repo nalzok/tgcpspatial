@@ -1,10 +1,10 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
 import numpy as np
-from numpy.fft import fft2, fftn, fftshift, ifft2, ifftn, ifftshift
+from numpy.fft import fft2, fftn, ifft2, ifftn, ifftshift
 from scipy.special import j0, jn_zeros
 
-from .util import blur2d, c2p, outerslice, p2c, zgrid
+from .util import blur2d, c2p, p2c, zgrid
 
 
 def ensurePSD(kern,eps=0.0):

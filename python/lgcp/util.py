@@ -1,9 +1,20 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
 
+import itertools
+import os
+import time as systime
+
+import multiprocess as multi
 import numpy as np
-from numpy.fft import (fft, fft2, fftfreq, fftn, fftshift, ifft, ifft2, ifftn,
-                       ifftshift)
+from numpy.fft import fft, fft2, fftfreq, fftn, fftshift, ifft, ifft2, ifftn, ifftshift
+from scipy.linalg import cholesky
+from scipy.linalg import solve_triangular as stri
+from scipy.linalg.lapack import dtrtri
+from scipy.signal import find_peaks
+from scipy.spatial import ConvexHull
+from scipy.special import jn_zeros
+from threadpoolctl import threadpool_limits
 
 
 def zgrid(W,H=None,):
@@ -25,7 +36,7 @@ def pdist(x1,x2):
     x1,x2 = np.array(x1),np.array(x2)
     s1,s2 = x1.shape,x2.shape
     d = np.abs(x1.ravel()[:,None]-x2.ravel()[None,:])
-    return d.reshape((s1+s2))
+    return d.reshape(s1+s2)
 
 ############################################################
 def outerslice(D,d):
@@ -36,9 +47,9 @@ def ndbroadcast(x,d=2):
     i = np.where(s==d)[0]
     if len(i)<=0: raise RuntimeError('No axis length %d'%d)
     i = i[0]
-    l = [None,]*len(s)
-    l[i] = np.s_[:]
-    return tuple(l)
+    slices = [None,]*len(s)
+    slices[i] = np.s_[:]
+    return tuple(slices)
 def truncateslice(shape):
     sl = [np.s_[:s] for s in shape]
     return tuple(sl)
@@ -59,8 +70,6 @@ def ndouter(*args):
         i += n
     return result
 ############################################################
-from scipy.linalg import cholesky
-from scipy.linalg.lapack import dtrtri
 
 
 def chinv(X,dtype=np.float32): # inv(x)=C.T@C
@@ -70,7 +79,6 @@ def chinv(X,dtype=np.float32): # inv(x)=C.T@C
     if info!=0: raise ValueError('lapack.dtrtri: '+(
         'arg %d invalid'%-info if info<0 else 'diagonal element %d is 0'%info))
     return dtype(X)
-from scipy.linalg import solve_triangular as stri
 
 
 def chsolve(H,v):
@@ -95,9 +103,9 @@ def sdiv(A,B,fill=0.0,eps=1.0842022e-19,inf=1.8446743e+19):
     x[z& s] = fill                 # 0/0 gets the fill value
     x[z&~s] = inf*np.sign(A[z&~s]) # Finite/0 gets "∞"
     return x
-    
+
+
 ############################################################
-import time as systime
 
 
 def current_milli_time():
@@ -117,7 +125,7 @@ def toc(vb=True,pfx=''):
     global __TIC_TIME__
     t = current_milli_time()
     try:
-        assert not __TIC_TIME__ is None
+        assert __TIC_TIME__ is not None
         dt = t-__TIC_TIME__
         if vb: print(pfx,'dt=%dms'%(dt))
         return t,dt
@@ -132,7 +140,7 @@ def pbar(x,N=None):
     K = int(np.floor(np.log10(N)))+1
     pattern = ' %%%dd/%d'%(K,N)
     wait_til_ms = systime.time()*1000
-    for i,x in enumerate(x):
+    for i,item in enumerate(x):
         time_ms = systime.time()*1000
         if time_ms>=wait_til_ms:
             r = i*50/N
@@ -142,7 +150,7 @@ def pbar(x,N=None):
                 ']%3d%%'%(i*100//N)+(pattern%i),
                 end='',flush=True)
             wait_til_ms = time_ms+1000
-        yield x
+        yield item
     print('\r'+' '*70+'\r',end='',flush=True)
     
 ############################################################
@@ -275,10 +283,7 @@ def radial_average(q):
 def fft_acorr(x,mask=None,window=True):
     H, W = x.shape
     v0 = np.var(x) if mask is None else np.var(x[mask])
-    if mask is None:
-        x = x - np.mean(x)
-    else:
-        x = (x - np.mean(x[mask])) * mask
+    x = x - np.mean(x) if mask is None else (x - np.mean(x[mask])) * mask
     x   = x*np.outer(np.hanning(H),np.hanning(W))
     psd = np.abs(fft2(x))**2/(W*H)
     acr = fftshift(ifft2(psd).real)
@@ -287,7 +292,6 @@ def fft_acorr(x,mask=None,window=True):
 def rac(y,mask=None):
     '''Radial autocorrelation of a 2D signal.'''
     return radial_average(fft_acorr(y,mask))
-from scipy.signal import find_peaks
 
 
 def racpeak(a,upsample=6):
@@ -314,7 +318,6 @@ def fft_upsample_1D(x,factor=4,circular=False):
         x = np.concatenate([x[::-1],x])
         x = fft_upsample_1D(x,factor,True)
         return x[n2:]
-from scipy.special import jn_zeros
 
 
 def racperiod(x, mask=None, res=50):
@@ -325,9 +328,8 @@ def racperiod(x, mask=None, res=50):
     Pp *= 2*np.pi/jn_zeros(1,2)[-1] 
     Pt *= 2*np.pi/jn_zeros(1,1)[-1]
     return Pp, Pt
-    
+
 ############################################################
-from scipy.spatial import ConvexHull
 
 
 def points_to_qhull(px,py):
@@ -372,7 +374,7 @@ def mask_to_qhull(mask):
     px=(px+.5)/W
     return points_to_qhull(px,py)
 def nan_mask(mask,nanvalue=False,value=None):
-    nanvalue = int(not(not nanvalue))
+    nanvalue = int(bool(nanvalue))
     if value is None: value = [1,0][nanvalue]
     use = np.float32([[np.nan,value],[value,np.nan]])[nanvalue]
     return use[np.int32(mask)]
@@ -399,11 +401,6 @@ def extend_mask(mask,radius):
     return fftconvx(mask, k)>0.5
 
 ############################################################
-import os
-import traceback
-
-import multiprocess as multi
-from threadpoolctl import threadpool_info, threadpool_limits
 
 
 def limit_cores(CORES_PER_THREAD=1): 
@@ -431,7 +428,7 @@ def parmap(f,jobs):
     njobs = len(jobs)
     with multi.Pool(multi.cpu_count()) as pool:
         results = dict(pbar(pool.imap(f,jobs),njobs))
-    return [results[i] if i in results else None for i,k in enumerate(jobs)]
+    return [results.get(i) for i,k in enumerate(jobs)]
 
 ############################################################
 def ideal_hex_grid(L,P):
@@ -470,7 +467,6 @@ def ndpoints(a,d=2):
         'point coordinates.')%(s,d))
     i = np.where(s==d)[0][0]
     return a.transpose(i,*sorted([*({*np.arange(n)}-{i})]))
-import itertools
 
 
 def bin_points(p,shape,w=None,wrap=None,method='linear'):
@@ -518,7 +514,7 @@ def bin_points(p,shape,w=None,wrap=None,method='linear'):
     elif method=='linear':
         q0 = np.ones((2,)*D+(N,))
         q = []
-        i,b = [],[]
+        _i,b = [],[]
         for d,(pd,L) in enumerate(zip(p,shape)):
             # Integer part: top-right bin in 2×2 neighborhood. 
             # Fractional part: how to distribute point mass

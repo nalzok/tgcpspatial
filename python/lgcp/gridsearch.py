@@ -93,12 +93,12 @@ def grid_search(
     # - Get shape of search grid
     # - Prepare an object array to save search results
     # - Start the search in the middle of this grid
-    # - Get the initial parameters 
-    # - Evalute the performance at these parameters    
+    # - Get the initial parameters
+    # - Evalute the performance at these parameters
     gridshape = [*map(len,pargrid)]
     NPARAMS   = len(gridshape)
     results   = np.full(gridshape,None,dtype='object')
-    pari      = [l//2 for l in gridshape]
+    pari      = [size//2 for size in gridshape]
     pars      = [pr[i] for pr,i in zip(pargrid,pari)]
     result0   = evaluate(pars,None)
     state0, likelihood0, info0 = result0
@@ -118,8 +118,7 @@ def grid_search(
         index = tuple(index)
         # Do nothing if we're outside the grid or already evaluated this index
         if not ingrid(index) or results[index] is not None: return
-        initial = [*map(array,state0)]
-        
+
         # Compute result and save
         pars            = [pr[i] for pr,i in zip(pargrid,index)]
         results[index]  = evaluate(pars,None,**opts)
@@ -138,7 +137,7 @@ def grid_search(
                 Δ = np.zeros(NPARAMS,'int32')
                 Δ[i] += d
                 Δs.add(tuple(Δ))
-        if not suggested_direction is None:
+        if suggested_direction is not None:
             Δ = suggested_direction
             if current_best()[0]==index:
                 search(np.int32(index)+Δ,Δ)
@@ -156,9 +155,6 @@ def grid_search(
     return GridsearchResult(best,pars,results[best],results,pargrid)
 
 
-from .infer import lgcp2d
-from .kern import kernelft
-from .util import parmap
 
 
 def optimize_PVtheta(N,K,prior_mean,P,V,

@@ -10,7 +10,7 @@ import numpy as np
 from .data import bin_spikes
 
 
-def findpeaks(q,height_thr=-inf,rclear=1):
+def findpeaks(q,height_thr=-np.inf,rclear=1):
     '''
     Find peaks in radius ``r`` neighborhood above ``height_thr``.
     Args:
