@@ -99,7 +99,7 @@ def grid_search(
     NPARAMS   = len(gridshape)
     results   = np.full(gridshape,None,dtype='object')
     pari      = [size//2 for size in gridshape]
-    pars      = [pr[i] for pr,i in zip(pargrid,pari)]
+    pars      = [pr[i] for pr,i in zip(pargrid,pari, strict=False)]
     result0   = evaluate(pars,None)
     state0, likelihood0, info0 = result0
 
@@ -110,23 +110,24 @@ def grid_search(
         return np.unravel_index(np.argmax(ll),results.shape), np.max(ll)
 
     # Bounds test for grid search
-    ingrid = lambda ix:all([i>=0 and i<Ni for i,Ni in zip(ix,gridshape)])
+    def ingrid(ix):
+        return all([i>=0 and i<Ni for i,Ni in zip(ix,gridshape, strict=False)])
     
     # Recursive grid search function
     def search(index,suggested_direction=None):
         nonlocal results
         index = tuple(index)
         # Do nothing if we're outside the grid or already evaluated this index
-        if not ingrid(index) or results[index] is not None: return
+        if not ingrid(index) or results[index] is not None:
+            return
 
         # Compute result and save
-        pars            = [pr[i] for pr,i in zip(pargrid,index)]
+        pars            = [pr[i] for pr,i in zip(pargrid,index, strict=False)]
         results[index]  = evaluate(pars,None,**opts)
         state, ll, info = results[index]
         if verbose:
-            print('\r[%s](%s) loss=%e'%\
-                (','.join(['%d'%i for i in index]),
-                 ','.join(['%0.2e'%p for p in pars]),ll),
+            print('\r[{}]({}) loss={:e}'.format(','.join([f'{i:d}' for i in index]),
+                 ','.join([f'{p:0.2e}' for p in pars]),ll),
                   flush=True,end='')
         # Figure out where to go next
         # - Try continuing in current direction first
@@ -143,13 +144,14 @@ def grid_search(
                 search(np.int32(index)+Δ,Δ)
                 Δs -= {tuple(Δ)}
         for Δ in Δs:
-            if current_best()[0]!=index: break
+            if current_best()[0]!=index:
+                break
             search(np.int32(index)+Δ,Δ)
         return
             
     search(pari)
     best = current_best()[0]
-    pars = [pr[i] for pr,i in zip(pargrid,best)]
+    pars = [pr[i] for pr,i in zip(pargrid,best, strict=False)]
     if verbose:
         print('(done)')
     return GridsearchResult(best,pars,results[best],results,pargrid)
@@ -181,13 +183,13 @@ def optimize_PVtheta(N,K,prior_mean,P,V,
         kernel = kernelft(N.shape,P=P,V=V,style='grid',angle=θi)
         return lgcp2d(kernel,*NKμ)[0]
     results = parmap(angle_helper,θs)
-    allzv, nll, λv = zip(*results)
+    allzv, nll, λv = zip(*results, strict=False)
     i = np.argmax(nll)
     θ = θs[i]
     print('Optimized parameters:')
-    print('P = %f'%P)
-    print('V = %f'%V)
-    print('θ = %f°'%(θ*180/np.pi))
+    print(f'P = {P:f}')
+    print(f'V = {V:f}')
+    print(f'θ = {θ*180/np.pi:f}°')
     return (P, V, θ), results[i]
 
 

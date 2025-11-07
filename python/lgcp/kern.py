@@ -86,12 +86,14 @@ def grid_kernel(
     ey: 2-vector; default (0,1)
         Basis vector for "vertical" direction.
     '''
-    if 'none' in str(window).lower(): window = None
-    if isinstance(shape,int): shape = (shape,shape)
+    if 'none' in str(window).lower():
+        window = None
+    if isinstance(shape,int):
+        shape = (shape,shape)
     H,W   = shape
 
     if P<2:
-        raise ValueError('Nyquist: P=%s cannot be <2 px'%P)
+        raise ValueError(f'Nyquist: P={P} cannot be <2 px')
     
     scale = 2*np.pi/P
     B     = np.linalg.pinv([[*ex],[*ey]])
@@ -117,7 +119,7 @@ def grid_kernel(
         kern = np.exp(-0.25*(r)**2)
         doblur = False
     else: 
-        raise ValueError('Style %s not implemented'%str(style))
+        raise ValueError(f'Style {str(style)} not implemented')
     
     # Windowing to avoid ringing in FT
     kern *= np.outer(np.hanning(H),np.hanning(W))
@@ -138,7 +140,7 @@ def grid_kernel(
         elif window=='square':
             clip  = r<cutoff
         else: 
-            raise ValueError('Window %s not implemented'%str(window))
+            raise ValueError(f'Window {str(window)} not implemented')
         kern *= clip
 
     if doblur:
@@ -151,11 +153,13 @@ def grid_kernel(
 def truncate(kf,wn=0.0,eth=0.1):
     if np.size(kf)>1:
         kept = kf >= np.max(kf.ravel()[1:])*eth
-    else: kept = np.full(kf.shape,True)
+    else:
+        kept = np.full(kf.shape,True)
     return (kf + wn)*kept
 
 def kernelft(shape,P=None,V=1.0,angle=0.0,dc=1e3,wn=0,eth=0.1,kept=None,**kw):
-    if isinstance(shape,int): shape=(shape,shape)
+    if isinstance(shape,int):
+        shape=(shape,shape)
     shape = tuple([*shape])
     k2 = grid_kernel(P,shape,angle=angle,**kw)*V
     kf = fft2(k2).real

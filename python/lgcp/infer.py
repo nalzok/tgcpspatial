@@ -25,15 +25,18 @@ def coordinate_descent(μ,v,
             dμ = meanupdate(μ,v)
             εμ = np.max(abs(dμ))
             μ  = μ + dμ
-            say('μ iter %d, ε=%0.4e'%(i,εμ))
-            if εμ<tol: break
+            say(f'μ iter {i:d}, ε={εμ:0.4e}')
+            if εμ<tol:
+                break
         for i in range(maxvariter):
             dv = varupdate(μ,v)
             εv = np.max(abs(dv))
             v  = v + alpha*dv
-            say('v iter %d, ε=%0.4e'%(i,εv))
-            if εv<tol: break
-        if εμ<tol and εv<tol: break
+            say(f'v iter {i:d}, ε={εv:0.4e}')
+            if εv<tol:
+                break
+        if εμ<tol and εv<tol:
+            break
     return μ,v
 
 
@@ -48,14 +51,14 @@ def get_hartley_components(mask):
     s = {*np.arange(D)}
     U = [np.any(mask,tuple([*(s-{i})])) for i in range(D)]
     # FFT each ROW
-    ff = [fft(np.eye(L),axis=0,norm='ortho')[u] for L,u in zip(h,U)]
+    ff = [fft(np.eye(L),axis=0,norm='ortho')[u] for L,u in zip(h,U, strict=False)]
     # Index lookup for kept components in each dimension
     fi = [np.cumsum(u)-1 for u in U]
     sl = [outerslice(D,d) for d in range(D)]
     rr = []
     for ii in np.int32(np.where(mask)).T:
-        ii = [ix[i] for i,ix in zip(ii,fi)]
-        fc = [fj[i] for i,fj in zip(ii,ff)]
+        ii = [ix[i] for i,ix in zip(ii,fi, strict=False)]
+        fc = [fj[i] for i,fj in zip(ii,ff, strict=False)]
         r = np.array(fc[0],copy=True)[sl[0]]
         for d in range(1,D):
             r = r*fc[d][sl[d]]
@@ -86,19 +89,23 @@ def lgcpnd(kf,N,K,z0f,zh0,vh0,eps=1e-5,mintol=1e-5,maxcomponents=1000,**opts):
     SHAPE = N.shape
     nmask = N>0     # Mask where observations exist
     kept  = kf>0    # Mask for retained Fourier components
-    if np.sum(kept)>maxcomponents: raise ValueError((
-        '%d nonzero kernel Fourier components; This is a '
+    if np.sum(kept)>maxcomponents:
+        raise ValueError(
+        f'{np.sum(kept):d} nonzero kernel Fourier components; This is a '
         'lot. Ensure that excluded components are zeroed-'
-        'out in the provided kernel Fourier transform')%np.sum(kept))
+        'out in the provided kernel Fourier transform')
     def unmask(u,mask):
         x = np.zeros(mask.shape,'f')
         x[mask] = np.ravel(u)
         return x
     def maskin(u,mask):
         return u.reshape(mask.shape)[mask]
-    ten = lambda x:np.float32(x).reshape(SHAPE)
-    So  = lambda u:ten(u)[nmask] #full→masked
-    St  = lambda u:unmask(u,nmask) #masked→full
+    def ten(x):
+        return np.float32(x).reshape(SHAPE)
+    def So(u):
+        return ten(u)[nmask] #full→masked
+    def St(u):
+        return unmask(u,nmask) #masked→full
     n   = np.ravel(N) # visits as a vector
     y   = np.ravel(Y) # rates as a vector
     ny  = n*y      # same as np.ravel(K)
@@ -106,16 +113,25 @@ def lgcpnd(kf,N,K,z0f,zh0,vh0,eps=1e-5,mintol=1e-5,maxcomponents=1000,**opts):
     ym  = So(y)    # rates at bins with nonzero visits
     nym = So(ny)   # total counts at bins with nonzero visits
     # Operators between low-rank subspace and (masked)state
-    Gt  = lambda u:np.ravel(RI(fftn(unmask(u,kept),norm='ortho'))) #loD→mask
-    Go  = lambda u:np.ravel(RI(fftn(ten(u),norm='ortho')[kept])) #mask→loD
-    Ft  = lambda u:np.ravel(RI(fftn(unmask(u,kept),norm='ortho')[nmask])) #loD→mask
-    Fo  = lambda u:np.ravel(RI(fftn(St(u),norm='ortho')[kept])) #mask→loD
+    def Gt(u):
+        return np.ravel(RI(fftn(unmask(u,kept),norm='ortho'))) #loD→mask
+    def Go(u):
+        return np.ravel(RI(fftn(ten(u),norm='ortho')[kept])) #mask→loD
+    def Ft(u):
+        return np.ravel(RI(fftn(unmask(u,kept),norm='ortho')[nmask])) #loD→mask
+    def Fo(u):
+        return np.ravel(RI(fftn(St(u),norm='ortho')[kept])) #mask→loD
     # Masked prior log-rate, log-mean guess
-    zhf = np.ravel(np.float32(zh0)) # Initial Δ<ln(λ)> from the prior
-    uh  = np.ravel(Go(zhf))      # Δ<ln(λ)> in low-rank space
-    vhf = np.ravel(np.float32(vh0)) # Initial log-rate marginal variances, full spatial domain
-    vh  = So(vhf)             # log-rate marginal variances for bins with data
-    z0  = So(z0f)             # prior mean-log-rate in spatial domain bins with data
+    # Initial Δ<ln(λ)> from the prior
+    zhf = np.ravel(np.float32(zh0))
+    # Δ<ln(λ)> in low-rank space
+    uh  = np.ravel(Go(zhf))
+    # Initial log-rate marginal variances, full spatial domain
+    vhf = np.ravel(np.float32(vh0))
+    # log-rate marginal variances for bins with data
+    vh  = So(vhf)
+    # prior mean-log-rate in spatial domain bins with data
+    z0  = So(z0f)
     # Low-rank kernel, inverse, truncated Fourier components
     kx = ifftn(kf,norm='ortho').real
     Kh = np.ravel(np.maximum(Go(kx),eps))
@@ -124,7 +140,8 @@ def lgcpnd(kf,N,K,z0f,zh0,vh0,eps=1e-5,mintol=1e-5,maxcomponents=1000,**opts):
     Fm = Gm[:,nmask.ravel()]
     # Preconditioner and constant terms in loss
     R  = np.size(Kh)
-    Mu = lambda u:Kh*np.ravel(u)
+    def Mu(u):
+        return Kh*np.ravel(u)
     M  = LinearOperator((R,R),Mu,Mu,dtype=np.float32)
     ldΣz = -ssum(slog(Λh)) # ln|Σ₀|
     ll0  = .5*(ldΣz-R)
@@ -142,7 +159,8 @@ def lgcpnd(kf,N,K,z0f,zh0,vh0,eps=1e-5,mintol=1e-5,maxcomponents=1000,**opts):
     def meanupdate(uh,vh):
         nr = _nr(uh,vh)
         J  = Λh*uh + Fo(nr-nym)
-        Hu = lambda u: Λh*u + Fo(nr*(Ft(u)))
+        def Hu(u):
+            return Λh*u + Fo(nr*(Ft(u)))
         Hv = LinearOperator((R,R),Hu,Hu,dtype=np.float32)
         return -np.float32(minres(Hv,J,rtol=mintol,M=M)[0])
     def _C(uh,vh): # Cholesky factor of covariance
@@ -161,8 +179,10 @@ def lgcpnd(kf,N,K,z0f,zh0,vh0,eps=1e-5,mintol=1e-5,maxcomponents=1000,**opts):
         return ten(z),ten(r),ten(v),ten(μ)
     def sample(nsamples,uho=None,vho=None):
         nonlocal uh,vh
-        if uho is None: uho = uh
-        if vho is None: vho = vh
+        if uho is None:
+            uho = uh
+        if vho is None:
+            vho = vh
         du =_C(uho,vho)@np.float32(np.random.randn(R,nsamples))
         u  = uho[:,None] + du
         z  = np.zeros(SHAPE+(nsamples,))
@@ -228,8 +248,10 @@ def lgcp2d(kf,N,K,prior_mean,initial_guess=(None,None),**opts):
     z0f = np.ravel(np.float32(prior_mean))
     # initial log-mean and marginal variance guesses
     zh0,vh0 = (None,None) if initial_guess is None else initial_guess
-    if zh0 is None: zh0 = np.zeros(np.size(N),'f')
-    if vh0 is None: vh0 = np.zeros(np.size(N),'f')
+    if zh0 is None:
+        zh0 = np.zeros(np.size(N),'f')
+    if vh0 is None:
+        vh0 = np.zeros(np.size(N),'f')
     assert np.size(zh0)==np.size(vh0)==np.size(N)
     return lgcpnd(kf,N,K,z0f,zh0,vh0,**opts)
 
@@ -254,19 +276,30 @@ def lgcpheading(kf,N,K,prior_mean,initial_guess=(None,None),**opts):
     # Priors z0 and initial guesses zh, and their masked and low-rank counterparts
     h0 = np.ones(D,'f') # No prior opinion on heading tuning
     # prior log-rate
-    if   np.size(prior_mean)==H*W:   z0f = np.ravel(ndouter(h0,prior_mean))
-    elif np.size(prior_mean)==D*H*W: z0f = np.ravel(np.float32(prior_mean))
-    else: assert 0
+    if   np.size(prior_mean)==H*W:
+        z0f = np.ravel(ndouter(h0,prior_mean))
+    elif np.size(prior_mean)==D*H*W:
+        z0f = np.ravel(np.float32(prior_mean))
+    else:
+        assert 0
     # initial log-mean and marginal variance guesses
     zh0,vh0 = (None,None) if initial_guess is None else initial_guess
-    if zh0 is None:        zhf = np.zeros(N.shape,'f')
-    elif np.size(zh0)==H*W:   zhf = np.ravel(ndouter(h0,zh0))
-    elif np.size(zh0)==D*H*W: zhf = np.ravel(np.float32(zh0))
-    else: assert 0
-    if vh0 is None:        vhf = np.zeros(N.shape,'f')
-    elif np.size(vh0)==H*W:   vhf = np.ravel(ndouter(h0,vh0))
-    elif np.size(vh0)==D*H*W: vhf = np.ravel(np.float32(vh0))
-    else: assert 0
+    if zh0 is None:
+        zhf = np.zeros(N.shape,'f')
+    elif np.size(zh0)==H*W:
+        zhf = np.ravel(ndouter(h0,zh0))
+    elif np.size(zh0)==D*H*W:
+        zhf = np.ravel(np.float32(zh0))
+    else:
+        assert 0
+    if vh0 is None:
+        vhf = np.zeros(N.shape,'f')
+    elif np.size(vh0)==H*W:
+        vhf = np.ravel(ndouter(h0,vh0))
+    elif np.size(vh0)==D*H*W:
+        vhf = np.ravel(np.float32(vh0))
+    else:
+        assert 0
     return lgcpnd(kf,N,K,z0f,zhf,vhf,**opts)
 
 

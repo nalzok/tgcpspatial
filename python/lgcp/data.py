@@ -75,9 +75,12 @@ class Arena:
         # Be exact! Account for integer rounding on H,W
         wq = (w2/W)*(H/h2) # width if we match height
         hq = (h2/H)*(W/w2) # height if we match width
-        if wq<=1:   w2 /= wq # Grid too wide
-        elif hq<=1: h2 /= hq # Grid too tall
-        else: assert 0
+        if wq<=1:
+            w2 /= wq # Grid too wide
+        elif hq<=1:
+            h2 /= hq # Grid too tall
+        else:
+            assert 0
         # Save scale information
         self.width_m  = w2
         self.height_m = h2
@@ -111,8 +114,10 @@ class Arena:
         self.extent = (x0,x1,y0,y1)
         self.wh     = np.float32([w2,h2])
         self.aspect = w2/h2
-        if not (W-1)/H<=self.aspect<=(W+1)/H: raise ValueError((
-            'Data have aspect w/h=%f but W/H=%d/%d=%f;')%(self.aspect,W,H,W/H))
+        if not (W-1)/H<=self.aspect<=(W+1)/H:
+            raise ValueError(
+                f'Data have aspect w/h={self.aspect:f} but W/H='
+                f'{W:d}/{H:d}={W/H:f};')
         # Convert animal's path to [0,1] coordinates
         self.nx=(x-x0)/w2
         self.ny=(y-y0)/h2
@@ -120,7 +125,8 @@ class Arena:
         # Get convex hull to make a mask
         hull = points_to_qhull(self.nx,self.ny)[0]
         mask = qhull_to_mask(hull,W,H)
-        if radius>0: mask = extend_mask(mask, radius)
+        if radius>0:
+            mask = extend_mask(mask, radius)
         hull, perim = mask_to_qhull(mask)
         self.perim   = perim
         self.hull    = hull
@@ -145,11 +151,13 @@ class Arena:
         return p/self.shape[::-1][s]
     def meters_to_bins(self,p):
         '''(x,y) bins to meters'''
-        if np.isscalar(p): return p*self.bins_per_meter
+        if np.isscalar(p):
+            return p*self.bins_per_meter
         return self.unit_to_bins(self.meters_to_unit(p))
     def bins_to_meters(self,p):
         '''(x,y) meters to bins'''
-        if np.isscalar(p): return p*self.meters_per_bin
+        if np.isscalar(p):
+            return p*self.meters_per_bin
         return self.unit_to_meters(self.bins_to_unit(p))
     def zgrid_meters(self,res=1):
         '''Location of each bin center in meters'''
@@ -159,39 +167,50 @@ class Arena:
         z = y[:,None]*1j + x[None,:]
         return z
     def contains(self,p,unit='meter'):
-        if   unit=='meter': p = self.meters_to_unit(p)
-        elif unit=='unit' : p = np.float32(p)
-        elif unit=='bin'  : p = self.bins_to_unit(p)
-        else: assert 0
+        if   unit=='meter':
+            p = self.meters_to_unit(p)
+        elif unit=='unit' :
+            p = np.float32(p)
+        elif unit=='bin'  :
+            p = self.bins_to_unit(p)
+        else:
+            assert 0
         return is_in_hull(p,self.hull)
     def distance_to_boundary(self, p):
         # Signed distance to boundary (interior = positive)
-        if np.shape(p)==(2,): p=np.reshape(p,(2,1))
+        if np.shape(p)==(2,):
+            p=np.reshape(p,(2,1))
         z  = self.zgrid_meters()
         zp = p2c(p)
         i  = self.contains(p)
         N = p.shape[1]
         D = np.zeros(N)
-        if np.sum( i)>0: D[ i]= np.min(pdist(z[~self.mask],zp[ i]),0)
-        if np.sum(~i)>0: D[~i]=-np.min(pdist(z[ self.mask],zp[~i]),0)
+        if np.sum( i)>0:
+            D[ i]= np.min(pdist(z[~self.mask],zp[ i]),0)
+        if np.sum(~i)>0:
+            D[~i]=-np.min(pdist(z[ self.mask],zp[~i]),0)
         return D
     def binto(self,xy,spikes=None,weights=None):
         px,py = self.meters_to_unit(np.float32(xy).T).T
-        if spikes is None: spikes = np.zeros(len(px))
+        if spikes is None:
+            spikes = np.zeros(len(px))
         H,W = self.shape
         return bin_spikes(px,py,spikes,self.shape,weights)
     def imshow(self,im,q0=0,q1=100,domask=True,lw=5,color='w',**k):
         immask = self.make_mask(*im.shape[:2])
         if len(np.shape(im))==2:
-            if domask: im = im*nan_mask(immask)
+            if domask:
+                im = im*nan_mask(immask)
             a,b = np.nanpercentile(im,[q0,q1])
             k   = {'vmin':a,'vmax':b}|k
         else:
             im = np.float32(im)
-            if domask: im = np.concatenate([im[...,:3],immask[...,None]],2)
+            if domask:
+                im = np.concatenate([im[...,:3],immask[...,None]],2)
         i = plt.imshow(im,extent=self.extent,**k)
         noxyaxes()
-        if domask: plot(*self.perim_m.T,color=color,lw=lw)
+        if domask:
+            plot(*self.perim_m.T,color=color,lw=lw)
         ylim(ylim()[::-1])
         return i
     def make_mask(self,H,W):
@@ -219,9 +238,12 @@ class Dataset:
     def from_file(fn):
         '''Load a dataset from disk.'''
         data = loadmat(fn,squeeze_me=True)
-        for varname in ['xy', 'dir', 'pos_sample_rate', 'pixels_per_m', 'spikes_times', 'spk_sample_rate']:
-            if varname not in data: raise ValueError(
-                'No variable "%s" in file %s.'%(varname,fn))
+        for varname in [
+            'xy', 'dir', 'pos_sample_rate', 'pixels_per_m',
+            'spikes_times', 'spk_sample_rate'
+        ]:
+            if varname not in data:
+                raise ValueError(f'No variable "{varname}" in file {fn}.')
         xy_position_px       = data['xy']
         head_direction_deg   = data['dir']
         position_sample_rate = data['pos_sample_rate']
@@ -230,7 +252,7 @@ class Dataset:
         spike_sample_rate    = data['spk_sample_rate']
         if len(spike_times_samples)==0:
             warnings.warn('The `spikes_times` variable '
-                'for file %s appears to be empty.'%fn, stacklevel=2)
+                f'for file {fn} appears to be empty.', stacklevel=2)
         # Convert units
         dt                  = 1 / position_sample_rate
         xy_position_meters  = xy_position_px / px_per_meter 
@@ -241,7 +263,9 @@ class Dataset:
         it,ft  = divmod(spike_times_seconds/dt,1)
         wt     = np.concatenate([1-ft,ft])
         qt     = np.concatenate([it,it+1])
-        spikes = np.float32(np.histogram(qt,np.arange(NSAMPLES+1),density=0,weights=wt)[0])
+        spikes = np.float32(
+            np.histogram(qt,np.arange(NSAMPLES+1),density=0,weights=wt)[0]
+        )
         # Repair defects in position tracking
         px,py = xy_position_meters.T
         zx,zy = patch_position_data(px,py,delta_threshold=dt)

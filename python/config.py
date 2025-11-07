@@ -12,7 +12,8 @@ import matplotlib as mpl
 import numpy as np
 
 path = os.getcwd().split(os.sep)
-while len(path) and path[-1]!='notebooks': path = path[:-1]
+while len(path) and path[-1]!='notebooks':
+    path = path[:-1]
 sys.path.append(os.sep.join(path[:-1]))
 datadir = os.sep.join(["krupic2018"])+os.sep
 datafiles = sorted([

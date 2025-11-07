@@ -35,7 +35,8 @@ def findpeaks(q,height_thr=-np.inf,rclear=1):
     limit = rclear**2
     for i in Δ:
         for j in Δ:
-            if i==j==0 or (i*i+j*j)>limit:continue
+            if i==j==0 or (i*i+j*j)>limit:
+                continue
             p &= q>qpad[i+rpad:H+i+rpad,j+rpad:W+j+rpad,...]
     return p
 
@@ -74,7 +75,8 @@ def interpolate_peaks(
     z += np.random.randn(*z.shape)*dither
     H,W  = z.shape[:2]
     is3d = len(z.shape)==3
-    if not is3d: z = z.reshape(H,W,1)
+    if not is3d:
+        z = z.reshape(H,W,1)
     if height_thr is None: 
         height_thr=np.nanpercentile(z,25)
     height_thr = np.max(height_thr, np.min(z)+6*dither)

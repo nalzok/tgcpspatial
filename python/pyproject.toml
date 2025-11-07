@@ -23,6 +23,9 @@ dev = [
 venvPath = "."
 venv = ".venv"
 
+[tool.ruff]
+extend-exclude = ["*.ipynb"]
+
 [tool.ruff.lint]
 select = [
     # pycodestyle
@@ -37,15 +40,4 @@ select = [
     "SIM",
     # isort
     "I",
-]
-
-ignore = [
-    "E501",  # Line too long - many long lines in scientific code
-    "E701",  # Multiple statements on one line (colon) - common in this codebase
-    "E702",  # Multiple statements on one line (semicolon)
-    "E722",  # Bare except - existing code pattern
-    "E731",  # Do not assign a lambda expression - lambdas are fine
-    "UP031", # Use format specifiers instead of percent format - too much work
-    "B904",  # Exception chaining - not critical for this codebase
-    "B905",  # zip() without an explicit strict= parameter - not critical
 ]

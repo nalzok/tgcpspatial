@@ -18,19 +18,22 @@ from threadpoolctl import threadpool_limits
 
 
 def zgrid(W,H=None,):
-    if H is None: H=W
+    if H is None:
+        H=W
     cw = np.arange(W)-W//2
     ch = np.arange(H)-H//2
     return 1j*ch[:,None]+cw[None,:]
 def p2c(p):
     p = np.array([*p])
-    if np.any(np.iscomplex(p)): return p
+    if np.any(np.iscomplex(p)):
+        return p
     which = np.where(np.int32(p.shape)==2)[0][0]
     p = p.transpose(which,*sorted(list({*np.arange(len(p.shape))}-{which})))
     return p[0]+1j*p[1]
 def c2p(z):
     z = np.complex64(z)
-    if np.any(np.isnan(z)): z[np.isnan(z)] = np.nan*(1+1j)
+    if np.any(np.isnan(z)):
+        z[np.isnan(z)] = np.nan*(1+1j)
     return np.array([z.real,z.imag])
 def pdist(x1,x2):
     x1,x2 = np.array(x1),np.array(x2)
@@ -45,7 +48,8 @@ def outerslice(D,d):
 def ndbroadcast(x,d=2):
     s = np.int32(np.shape(x))
     i = np.where(s==d)[0]
-    if len(i)<=0: raise RuntimeError('No axis length %d'%d)
+    if len(i)<=0:
+        raise RuntimeError(f'No axis length {d:d}')
     i = i[0]
     slices = [None,]*len(s)
     slices[i] = np.s_[:]
@@ -76,8 +80,9 @@ def chinv(X,dtype=np.float32): # inv(x)=C.T@C
     X = dtype(X)
     X = cholesky(X,lower=True)
     X,info = dtrtri(X,lower=True)
-    if info!=0: raise ValueError('lapack.dtrtri: '+(
-        'arg %d invalid'%-info if info<0 else 'diagonal element %d is 0'%info))
+    if info!=0:
+        raise ValueError('lapack.dtrtri: '+(
+        f'arg {-info:d} invalid' if info<0 else f'diagonal element {info:d} is 0'))
     return dtype(X)
 
 
@@ -92,7 +97,8 @@ def slog(x):
 def ssum(u,**kw):
     return np.nansum(u,dtype=np.float32,**kw)
 def smean(x,*args,default=np.nan,**kwargs):
-    if np.size(x)<1: return default
+    if np.size(x)<1:
+        return default
     return np.nanmean(x,*args,**kwargs)
 def sdiv(A,B,fill=0.0,eps=1.0842022e-19,inf=1.8446743e+19):
     A,B = np.array(A), np.array(B,copy=True)
@@ -116,9 +122,11 @@ def tic(vb=True,pfx=''):
     t = current_milli_time()
     try:
         assert __TIC_TIME__ is not None
-        if vb: print(pfx,'t=%dms'%(t-__TIC_TIME__))
-    except: 
-        if vb: print("timing...")
+        if vb:
+            print(pfx,f't={t-__TIC_TIME__:d}ms')
+    except AssertionError:
+        if vb:
+            print("timing...")
     __TIC_TIME__ = t
     return t
 def toc(vb=True,pfx=''):
@@ -127,18 +135,21 @@ def toc(vb=True,pfx=''):
     try:
         assert __TIC_TIME__ is not None
         dt = t-__TIC_TIME__
-        if vb: print(pfx,'dt=%dms'%(dt))
+        if vb:
+            print(pfx,f'dt={dt:d}ms')
         return t,dt
-    except: 
-        if vb: print("havn't called tic yet?")
+    except AssertionError:
+        if vb:
+            print("havn't called tic yet?")
     return t,None
 def pbar(x,N=None):
     if N is None:
         x = list(x)
         N = len(x)
-        if N<=0: return None
+        if N<=0:
+            return None
     K = int(np.floor(np.log10(N)))+1
-    pattern = ' %%%dd/%d'%(K,N)
+    pattern = f' %%{K:d}d/{N:d}'
     wait_til_ms = systime.time()*1000
     for i,item in enumerate(x):
         time_ms = systime.time()*1000
@@ -147,7 +158,7 @@ def pbar(x,N=None):
             k = int(r)
             q = ' ▏▎▍▌▋▊▉'[int((r-k)*8)]
             print('\r['+('█'*k)+q+(' '*(50-k-1))+
-                ']%3d%%'%(i*100//N)+(pattern%i),
+                f']{i*100//N:3d}%%'+(pattern%i),
                 end='',flush=True)
             wait_til_ms = time_ms+1000
         yield item
@@ -173,16 +184,19 @@ def fftfreqn(shape,shift=False):
     xy = np.zeros(shape+(D,))
     for d,L in enumerate(shape):
         s = fftfreq(L,1/L)
-        if shift: s = fftshift(s)
+        if shift:
+            s = fftshift(s)
         xy[...,d] = s[outerslice(D,d)]
     return np.float32(xy)
 def blurkernel2D(V,W,H=None,normalize=False):
-    if H is None: H=W
+    if H is None:
+        H=W
     V = np.array(V)
     Λ = np.eye(2)/V**2 if np.size(V)==1 else np.linalg.pinv((V + V.T)*.5)
     xy = fftfreqn((H,W),True)
     k = np.exp(-0.5*np.einsum('hwd,dD,hwD->hw',xy,Λ,xy))
-    if normalize: k /= np.sum(k)
+    if normalize:
+        k /= np.sum(k)
     return ifftshift(k)
 def fftconvf(x,K):
     if x.shape!=K.shape and np.size(x)==np.size(K):
@@ -201,7 +215,8 @@ def fft_upsample_2D(x,factor=4):
         c = (np.arange(nc)-(nc-1)/2)/nc
         z = r[:,None]+c[None,:]*1j
         return np.abs(z)<.5
-    if len(x.shape)==2: x = x.reshape((1,)+x.shape)
+    if len(x.shape)==2:
+        x = x.reshape((1,)+x.shape)
     nl,nr,nc = x.shape
     f = fftshift(fft2(x),axes=(-1,-2))
     f = f*circle_mask(nr,nc)
@@ -354,7 +369,8 @@ def xygrid(shape,res=1,z=False,scale=(1.0,1.0),):
         return p2c(g) #HW
     return g.transpose(1,2,0) # HW2
 def is_in_hull(P,hull):
-    if np.size(P)<=0: return np.empty(np.shape(P),bool)
+    if np.size(P)<=0:
+        return np.empty(np.shape(P),bool)
     P = c2p(p2c(P)).T # lazy code reuse: ensure array shape
     A = hull.equations[:,0:-1]
     b = np.transpose(np.array([hull.equations[:,-1]]))
@@ -375,7 +391,8 @@ def mask_to_qhull(mask):
     return points_to_qhull(px,py)
 def nan_mask(mask,nanvalue=False,value=None):
     nanvalue = int(bool(nanvalue))
-    if value is None: value = [1,0][nanvalue]
+    if value is None:
+        value = [1,0][nanvalue]
     use = np.float32([[np.nan,value],[value,np.nan]])[nanvalue]
     return use[np.int32(mask)]
 def disk_kernel(W,H,R,u=10):
@@ -407,10 +424,12 @@ def limit_cores(CORES_PER_THREAD=1):
     keys = ['MKL_NUM_THREADS','NUMEXPR_NUM_THREADS',
         'OMP_NUM_THREADS ','OPENBLAS_NUM_THREADS',
         'VECLIB_MAXIMUM_THREADS']
-    for k in keys: os.environ[k] = str(CORES_PER_THREAD)
-    os.environ["XLA_FLAGS"] = \
-    "--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads=%d"\
-    %CORES_PER_THREAD
+    for k in keys:
+        os.environ[k] = str(CORES_PER_THREAD)
+    os.environ["XLA_FLAGS"] = (
+        f"--xla_cpu_multi_thread_eigen=false intra_op_parallelism_threads="
+        f"{CORES_PER_THREAD:d}"
+    )
     threadpool_limits(limits=CORES_PER_THREAD, user_api='blas')
 def parmaphelper(f):
     def foo(args):
@@ -419,7 +438,7 @@ def parmaphelper(f):
         i,args = args
         try:
             return i,f(*args)
-        except:
+        except TypeError:
             return i,f(args)
     return foo
 def parmap(f,jobs):
@@ -448,23 +467,27 @@ def ideal_hex_grid(L,P):
 def ndpoints(a,d=2):
     a = np.array(a)
     if np.any(np.iscomplex(a)):
-        if d!=2: raise ValueError(
-            'Cannot interpret complexas dimension=%d points'%d)
+        if d!=2:
+            raise ValueError(
+            f'Cannot interpret complexas dimension={d:d} points')
         return np.real(a), np.imag(a)
     s = np.int32(np.shape(a))
     n = len(s)
     if n==1:
         if len(a)==d:
             return a.reshape(d,1)
-        if not d==1: raise ValueError(
-            'Cannot interpret 1D array as %d-d points'%d)
+        if not d==1:
+            raise ValueError(
+            f'Cannot interpret 1D array as {d:d}-d points')
         return a.reshape(1,len(a))
-    if np.sum(s==d)<1: raise ValueError(
-        'Array needs at least one axis dimension %d'%d)
-    if np.sum(s==d)>2: raise ValueError((
-        'Array shape %s has multiple lenght-%d dimensions, '
+    if np.sum(s==d)<1:
+        raise ValueError(
+        f'Array needs at least one axis dimension {d:d}')
+    if np.sum(s==d)>2:
+        raise ValueError(
+        f'Array shape {s} has multiple lenght-{d:d} dimensions, '
         'cannot unambiguously determine which axis has '
-        'point coordinates.')%(s,d))
+        'point coordinates.')
     i = np.where(s==d)[0][0]
     return a.transpose(i,*sorted([*({*np.arange(n)}-{i})]))
 
@@ -491,12 +514,14 @@ def bin_points(p,shape,w=None,wrap=None,method='linear'):
     '''
     D = len(shape)
     # Implement wrapping by adding bin and removing later
-    if wrap is None:   wrap = False
-    if np.isscalar(wrap): wrap = [np.float32(wrap)!=0,]*D
+    if wrap is None:
+        wrap = False
+    if np.isscalar(wrap):
+        wrap = [np.float32(wrap)!=0,]*D
     wrap = np.float32(wrap)!=0
     assert len(wrap)==D
     oldshape = np.int32(shape)
-    shape = [i+1 if w else i for (i,w) in zip(shape,wrap)]
+    shape = [i+1 if w else i for (i,w) in zip(shape,wrap, strict=False)]
     # Clean up point data
     p = ndpoints(p,D)
     N = np.prod(p.shape[1:])
@@ -515,7 +540,7 @@ def bin_points(p,shape,w=None,wrap=None,method='linear'):
         q0 = np.ones((2,)*D+(N,))
         q = []
         _i,b = [],[]
-        for d,(pd,L) in enumerate(zip(p,shape)):
+        for d,(pd,L) in enumerate(zip(p,shape, strict=False)):
             # Integer part: top-right bin in 2×2 neighborhood. 
             # Fractional part: how to distribute point mass
             ip,fp = divmod(pd*(L-1),1)
@@ -551,7 +576,8 @@ def bin_points(p,shape,w=None,wrap=None,method='linear'):
         bins = [np.arange(L+1) for L in shape]
         z *= np.concatenate((w,)*(2**D))
         N = np.histogramdd(q.T,bins,density=False,weights=z)[0]
-    else: raise ValueError(
+    else:
+        raise ValueError(
         'method should be "linear" or "nearest"')
     # Handle wrapped variables
     for d in np.where(wrap)[0]:
@@ -577,16 +603,20 @@ def get_edges(signal,pad_edges=True):
     stops  = list(np.where(np.diff(np.int32(signal))==-1)[0]+1)
     if pad_edges:
         # Add artificial start/stop time to incomplete blocks
-        if signal[0 ]: starts = [0]   + starts
-        if signal[-1]: stops  = stops + [len(signal)]
+        if signal[0 ]:
+            starts = [0]   + starts
+        if signal[-1]:
+            stops  = stops + [len(signal)]
     else:
         # Remove incomplete blocks
-        if signal[0 ]: stops  = stops[1:]
-        if signal[-1]: starts = starts[:-1]
+        if signal[0 ]:
+            stops  = stops[1:]
+        if signal[-1]:
+            starts = starts[:-1]
     return np.array([np.array(starts), np.array(stops)])
 def interpolate_nan(u):
     u = np.array(u)
-    for s,e in zip(*get_edges(~np.isfinite(u))):
+    for s,e in zip(*get_edges(~np.isfinite(u)), strict=False):
         if s==0: 
             u[:e+1] = u[e+1]
         elif e==len(u): 

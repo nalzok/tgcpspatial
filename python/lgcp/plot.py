@@ -58,7 +58,8 @@ mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=CYCLE)
     
 
 def noaxis(ax=None):
-    if ax is None: ax=plt.gca()
+    if ax is None:
+        ax=plt.gca()
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
@@ -66,27 +67,35 @@ def noaxis(ax=None):
     ax.get_xaxis().tick_bottom()
     ax.get_yaxis().tick_left()
 def nox():
-    plt.xticks([]); plt.xlabel('')
+    plt.xticks([])
+    plt.xlabel('')
 def noy():
-    plt.yticks([]); plt.ylabel('')
+    plt.yticks([])
+    plt.ylabel('')
 def noxyaxes():
-    nox(); noy(); noaxis()
+    nox()
+    noy()
+    noaxis()
 def figurebox(color=(0.6,0.6,0.6)):
     from matplotlib import lines, pyplot
     ax2 = pyplot.axes([0,0,1,1],facecolor=(1,1,1,0))# axisbg=(1,1,1,0))
     x,y = np.array([[0,0,1,1,0], [0,1,1,0,0]])
     line = lines.Line2D(x, y, lw=1, color=color)
     ax2.add_line(line)
-    plt.xticks([]); plt.yticks([]); noxyaxes()
+    plt.xticks([])
+    plt.yticks([])
+    noxyaxes()
 def simpleaxis(ax=None):
-    if ax is None: ax=plt.gca()
+    if ax is None:
+        ax=plt.gca()
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.get_xaxis().tick_bottom()
     ax.get_yaxis().tick_left()
     ax.autoscale(enable=True, axis='x', tight=True)
 def rightaxis(ax=None):
-    if ax is None: ax=plt.gca()
+    if ax is None:
+        ax=plt.gca()
     ax.spines['top'].set_visible(False)
     ax.spines['left'].set_visible(False)
     ax.yaxis.set_label_position("right")
@@ -94,7 +103,8 @@ def rightaxis(ax=None):
     ax.get_xaxis().tick_bottom()
     ax.autoscale(enable=True, axis='x', tight=True)
 def simpleraxis(ax=None):
-    if ax is None: ax=plt.gca()
+    if ax is None:
+        ax=plt.gca()
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
@@ -102,50 +112,63 @@ def simpleraxis(ax=None):
     ax.get_yaxis().tick_left()
     ax.autoscale(enable=True, axis='x', tight=True)
 def px2xf(n,ax=None,fig=None):
-    if fig is None: fig = plt.gcf()
-    if ax  is None: ax  = plt.gca()
+    if fig is None:
+        fig = plt.gcf()
+    if ax  is None:
+        ax  = plt.gca()
     w_pixels = fig.get_size_inches()[0]*fig.dpi
     return n/float(w_pixels)
 def px2yf(n,ax=None,fig=None):
-    if fig is None: fig = plt.gcf()
-    if ax  is None: ax  = plt.gca()
+    if fig is None:
+        fig = plt.gcf()
+    if ax  is None:
+        ax  = plt.gca()
     h_pixels = fig.get_size_inches()[1]*fig.dpi
     return n/float(h_pixels)
 def nudge_axis_left(dx,ax=None):
-    if ax is None: ax = plt.gca()
+    if ax is None:
+        ax = plt.gca()
     bb = ax.get_position()
     x,y,w,h = bb.xmin,bb.ymin,bb.width,bb.height
     dx = px2xf(dx,ax)
     ax.set_position((x+dx,y,w-dx,h))
 def nudge_axis_right(dx,ax=None):
-    if ax is None: ax = plt.gca()
+    if ax is None:
+        ax = plt.gca()
     bb = ax.get_position()
     x,y,w,h = bb.xmin,bb.ymin,bb.width,bb.height
     dx = px2xf(dx,ax)
     ax.set_position((x,y,w-dx,h))
 def nudge_axis_x(dx,ax=None):
-    if ax is None: ax = plt.gca()
+    if ax is None:
+        ax = plt.gca()
     bb = ax.get_position()
     x,y,w,h = bb.xmin,bb.ymin,bb.width,bb.height
     dx = px2xf(dx,ax)
     ax.set_position((x+dx,y,w,h))
 def nudge_axis_y_pixels(dy,ax=None):
-    if ax is None: ax=plt.gca()
+    if ax is None:
+        ax=plt.gca()
     bb = ax.get_position()
     x,y,w,h = bb.xmin,bb.ymin,bb.width,bb.height
     dy = -px2yf(float(dy),ax)
     ax.set_position((x,y-dy,w,h))
 def adjust_axis_height_pixels(dy,ax=None):
-    if ax is None: ax=plt.gca()
+    if ax is None:
+        ax=plt.gca()
     bb = ax.get_position()
     x,y,w,h = bb.xmin,bb.ymin,bb.width,bb.height
     ax.set_position((x,y,w,h-px2yf(float(dy),ax)))
 def nicey(**kwargs):
-    if ylim()[0]<0: plt.yticks([plt.ylim()[0],0,plt.ylim()[1]])
-    else:           plt.yticks([plt.ylim()[0],plt.ylim()[1]])
+    if ylim()[0]<0:
+        plt.yticks([plt.ylim()[0],0,plt.ylim()[1]])
+    else:
+        plt.yticks([plt.ylim()[0],plt.ylim()[1]])
 def nicex(**kwargs):
-    if xlim()[0]<0: plt.xticks([plt.xlim()[0],0,plt.xlim()[1]])
-    else:           plt.xticks([plt.xlim()[0],plt.xlim()[1]])
+    if xlim()[0]<0:
+        plt.xticks([plt.xlim()[0],0,plt.xlim()[1]])
+    else:
+        plt.xticks([plt.xlim()[0],plt.xlim()[1]])
 def nicexy(xby=None,yby=None,**kwargs):
     nicex(by=xby,**kwargs)
     nicey(by=yby,**kwargs)
@@ -156,18 +179,24 @@ def right_legend(*args,fudge=0.0,**kwargs):
     lg.get_frame().set_linewidth(0.0)
     return lg
 def xticklen(length=0,w=None,ax=None,which='both',**kwargs):
-    if ax is None: ax = plt.gca()
+    if ax is None:
+        ax = plt.gca()
     ax.xaxis.set_tick_params(length=length, width=w, which=which, **kwargs)
 def yticklen(length=0,w=None,ax=None,which='both',**kwargs):
-    if ax is None: ax = plt.gca()
+    if ax is None:
+        ax = plt.gca()
     ax.yaxis.set_tick_params(length=length, width=w, which=which, **kwargs)
 def noclip(ax=None):
-    if ax is None: ax = plt.gca()
-    for o in ax.findobj(): o.set_clip_on(False)
+    if ax is None:
+        ax = plt.gca()
+    for o in ax.findobj():
+        o.set_clip_on(False)
 def get_ax_size(ax=None,fig=None):
     '''Gets tha axis size in figure-relative units'''
-    if fig is None: fig = plt.gcf()
-    if ax is None: ax  = plt.gca()
+    if fig is None:
+        fig = plt.gcf()
+    if ax is None:
+        ax  = plt.gca()
     fig  = plt.gcf()
     ax   = plt.gca()
     bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
@@ -177,18 +206,23 @@ def get_ax_size(ax=None,fig=None):
     return width, height
 def px2x(n,ax=None,fig=None):
     '''Convert pixels to units of the current x-axis.'''
-    if fig is None: fig = plt.gcf()
-    if ax  is None: ax  = plt.gca()
+    if fig is None:
+        fig = plt.gcf()
+    if ax  is None:
+        ax  = plt.gca()
     w,h = get_ax_size()
     return n*np.diff(plt.xlim())[0]/float(w)
 def px2y(n,ax=None,fig=None):
     '''Convert pixels to units of the current y-axis scale.'''
-    if fig is None: fig = plt.gcf()
-    if ax  is None: ax  = plt.gca()
+    if fig is None:
+        fig = plt.gcf()
+    if ax  is None:
+        ax  = plt.gca()
     w,h = get_ax_size()
     return n*np.diff(plt.ylim())[0]/float(h)
 def force_aspect(aspect=1,a=None):
-    if a is None: a = plt.gca()
+    if a is None:
+        a = plt.gca()
     x1,x2=a.get_xlim()
     y1,y2=a.get_ylim()
     a.set_aspect(np.abs((x2-x1)/(y2-y1))/aspect)
@@ -203,7 +237,8 @@ def darken(color,amount=0.2):
     color = (1-amount) * color
     return color
 def subfigurelabel(x,fontsize=10,dx=39,dy=7,ax=None,bold=True,**kwargs):
-    if ax is None: ax = plt.gca()
+    if ax is None:
+        ax = plt.gca()
     fontproperties = {
         'fontsize':fontsize,
         'family':'Bitstream Vera Sans',
@@ -218,9 +253,11 @@ def subfigurelabel(x,fontsize=10,dx=39,dy=7,ax=None,bold=True,**kwargs):
 def yscalebar(ycenter,yheight,label,x=None,color='k',fontsize=9,ax=None,side='left'):
     '''Add vertical scale bar to plot'''
     yspan = [ycenter-yheight/2.0,ycenter+yheight/2.0]
-    if ax is None: ax = plt.gca()
+    if ax is None:
+        ax = plt.gca()
     plt.draw()
-    if x is None: x = -px2xf(5)
+    if x is None:
+        x = -px2xf(5)
     xl = ax.get_xlim()
     yl = ax.get_ylim()
     plt.plot([x,x],yspan,
@@ -487,7 +524,7 @@ def covariance_crosshairs(
     S = np.float32(S)
     if not S.shape==(2,2):
         raise ValueError('S should be a 2x2 covariance '
-                         'matrix, got %s'%S)
+                         f'matrix, got {S}')
     if mode=='2D':
         # Points in any direction within percentile
         sigma = np.sqrt(scipy.stats.chi2.ppf(p,df=2))
@@ -498,9 +535,9 @@ def covariance_crosshairs(
         raise ValueError("Mode must be '2D' or '1D'")
     try:
         e,v   = scipy.linalg.eigh(S)
-    except:
+    except (np.linalg.LinAlgError, ValueError) as err:
         raise ValueError('Could not get covariance '
-            'eigenspace, is S=%s full-rank?'%repr(S))
+            f'eigenspace, is S={repr(S)} full-rank?') from err
     e     = np.maximum(0,e)
     lines = unit_crosshairs(draw_ellipse,draw_cross)*sigma
     return v.T.dot(lines*(e**0.5)[:,None])
@@ -568,7 +605,8 @@ def good_colorbar(vmin=None,
         vmax = img.get_clim()[1]
         ax   = img.axes
     oldax = plt.gca() #remember previously active axis
-    if ax is None: ax=plt.gca()
+    if ax is None:
+        ax=plt.gca()
     SPACING = px2xf(spacing,ax=ax)
     CWIDTH  = px2xf(width,ax=ax)
     # manually add colorbar axes 
