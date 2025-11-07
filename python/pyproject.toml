@@ -1,0 +1,18 @@
+[project]
+name = "tgcp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "jupyterlab>=4.4.10",
+    "matplotlib>=3.10.7",
+    "multiprocess>=0.70.18",
+    "numpy>=2.3.4",
+    "scipy>=1.16.3",
+    "threadpoolctl>=3.6.0",
+]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
