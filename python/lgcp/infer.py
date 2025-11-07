@@ -150,7 +150,7 @@ def lgcpnd(kf,N,K,z0f,zh0,vh0,eps=1e-5,mintol=1e-5,maxcomponents=1000,**opts):
         J  = Λh*uh + Fo(nr-nym)
         Hu = lambda u: Λh*u + Fo(nr*(Ft(u)))
         Hv = LinearOperator((R,R),Hu,Hu,dtype=np.float32)
-        return -float32(minres(Hv,J,tol=mintol,M=M)[0])
+        return -float32(minres(Hv,J,rtol=mintol,M=M)[0])
     def _C(uh,vh): # Cholesky factor of covariance
         x = sqrt(_nr(uh,vh))[None,:]*Fm
         return chinv(diag(Λh) + x@x.T)

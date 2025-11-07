@@ -15,7 +15,7 @@ from .sg   import *
 
 class Arena:
     '''2D gridded experimental arena'''
-    def __init__(self,points,shape,margin=0.15,radius=0.0):
+    def __init__(self,points,shape,margin=0.1,radius=0.0):
         '''
         Args:
             points (tuple): (x,y) points in meters.

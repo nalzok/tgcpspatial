@@ -557,7 +557,7 @@ def get_edges(signal,pad_edges=True):
     if tuple(sorted(unique(signal)))==(-2,-1):
         raise ValueError('signal should be bool or int∈{0,1};'+
             ' (using ~ on an int array?)')
-    signal = int32(bool8(signal))
+    signal = int32(np.bool(signal))
     starts = list(where(diff(int32(signal))==1)[0]+1)
     stops  = list(where(diff(int32(signal))==-1)[0]+1)
     if pad_edges:
