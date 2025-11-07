@@ -6,12 +6,19 @@ Resolution for the camera used to record R1 is 350px/m;
 resolution for other rats (R11 and R18) was 338px/m
 Fs = 50.0 # Sample rate of data (samples/second)
 """
-from numpy import *
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.pyplot import plot, ylim
 from scipy.io import loadmat
 from scipy.special import jn_zeros
-from .util import *
-from .plot import *
-from .sg   import *
+
+from .plot import noxyaxes
+from .sg import SGdifferentiate, SGsmooth
+from .util import (bin_spikes, c2p, extend_mask, fft_acorr, fftfreqn,
+                   is_in_hull, kde, mask_to_qhull, nan_mask, ndbroadcast, p2c,
+                   patch_position_data, pdist, points_to_qhull, qhull_to_mask,
+                   racperiod, sdiv, slog)
+
 
 class Arena:
     '''2D gridded experimental arena'''
@@ -25,8 +32,8 @@ class Arena:
         '''
         x,y = points
         # Geometry of arena in meters
-        minx,maxx = nanmin(x),nanmax(x)
-        miny,maxy = nanmin(y),nanmax(y)
+        minx,maxx = np.nanmin(x),np.nanmax(x)
+        miny,maxy = np.nanmin(y),np.nanmax(y)
         midx,midy = (minx+maxx)/2.0, (miny+maxy)/2.0;
         w,h       = maxx-minx,maxy-miny
         # Add padding
@@ -43,7 +50,7 @@ class Arena:
                 W,H = shape, int(round(shape/aspect))
             shape = (H,W)
         H,W = shape
-        self.shape = int32(shape)
+        self.shape = np.int32(shape)
         self.H = H
         self.W = W
         self.ngrid = self.W*self.H
@@ -61,10 +68,10 @@ class Arena:
         self.meters_per_biny = h2/self.H
         self.bins_per_meterx = 1.0/self.meters_per_binx
         self.bins_per_metery = 1.0/self.meters_per_biny
-        self.meters_per_bin = sqrt(self.area_m/self.ngrid)
+        self.meters_per_bin = np.sqrt(self.area_m/self.ngrid)
         self.bins_per_meter = 1.0/self.meters_per_bin
-        er1 = abs(self.meters_per_binx-self.meters_per_biny)
-        er2 = abs(self.bins_per_meterx-self.bins_per_metery)
+        er1 = np.abs(self.meters_per_binx-self.meters_per_biny)
+        er2 = np.abs(self.bins_per_meterx-self.bins_per_metery)
         if er1>1e-6 or er2>1e-6:
             print('w (meters)',w2)
             print('h (meters)',h2)
@@ -82,16 +89,16 @@ class Arena:
         self.y0 = y0
         self.x1 = x1
         self.y1 = y1
-        self.origin = float32([x0,y0])
+        self.origin = np.float32([x0,y0])
         self.extent = (x0,x1,y0,y1)
-        self.wh     = float32([w2,h2])
+        self.wh     = np.float32([w2,h2])
         self.aspect = w2/h2
         if not (W-1)/H<=self.aspect<=(W+1)/H: raise ValueError((
             'Data have aspect w/h=%f but W/H=%d/%H=%f;')%(self.aspect,W,H,W/H))
         # Convert animal's path to [0,1] coordinates
         self.nx=(x-x0)/w2
         self.ny=(y-y0)/h2
-        self.binwh = self.wh/float32([W,H])
+        self.binwh = self.wh/np.float32([W,H])
         # Get convex hull to make a mask
         hull = points_to_qhull(self.nx,self.ny)[0]
         mask = qhull_to_mask(hull,W,H)
@@ -120,22 +127,22 @@ class Arena:
         return p/self.shape[::-1][s]
     def meters_to_bins(self,p):
         '''(x,y) bins to meters'''
-        if isscalar(p): return p*self.bins_per_meter
+        if np.isscalar(p): return p*self.bins_per_meter
         return self.unit_to_bins(self.meters_to_unit(p))
     def bins_to_meters(self,p):
         '''(x,y) meters to bins'''
-        if isscalar(p): return p*self.meters_per_bin
+        if np.isscalar(p): return p*self.meters_per_bin
         return self.unit_to_meters(self.bins_to_unit(p))
     def zgrid_meters(self,res=1):
         '''Location of each bin center in meters'''
         H,W = self.shape
-        x = linspace(self.x0,self.x1,W*res)
-        y = linspace(self.y0,self.y1,H*res)
+        x = np.linspace(self.x0,self.x1,W*res)
+        y = np.linspace(self.y0,self.y1,H*res)
         z = y[:,None]*1j + x[None,:]
         return z
     def contains(self,p,unit='meter'):
         if   unit=='meter': p = self.meters_to_unit(p)
-        elif unit=='unit' : p = float32(p)
+        elif unit=='unit' : p = np.float32(p)
         elif unit=='bin'  : p = self.bins_to_unit(p)
         else: assert 0
         return is_in_hull(p,self.hull)
@@ -146,32 +153,32 @@ class Arena:
         zp = p2c(p)
         i  = self.contains(p)
         N = p.shape[1]
-        D = zeros(N)
-        if sum( i)>0: D[ i]= np.min(pdist(z[~self.mask],zp[ i]),0)
-        if sum(~i)>0: D[~i]=-np.min(pdist(z[ self.mask],zp[~i]),0)
+        D = np.zeros(N)
+        if np.sum( i)>0: D[ i]= np.min(pdist(z[~self.mask],zp[ i]),0)
+        if np.sum(~i)>0: D[~i]=-np.min(pdist(z[ self.mask],zp[~i]),0)
         return D
     def binto(self,xy,spikes=None,weights=None):
-        px,py = self.meters_to_unit(float32(xy).T).T
-        if spikes is None: spikes = zeros(len(px))
+        px,py = self.meters_to_unit(np.float32(xy).T).T
+        if spikes is None: spikes = np.zeros(len(px))
         H,W = self.shape
         return bin_spikes(px,py,spikes,self.shape,weights)
     def imshow(self,im,q0=0,q1=100,domask=True,lw=5,color='w',**k):
         immask = self.make_mask(*im.shape[:2])
-        if len(shape(im))==2:
+        if len(np.shape(im))==2:
             if domask: im = im*nan_mask(immask)
-            a,b = nanpercentile(im,[q0,q1])
+            a,b = np.nanpercentile(im,[q0,q1])
             k   = {'vmin':a,'vmax':b}|k
         else:
-            im = float32(im)
-            if domask: im = concatenate([im[...,:3],immask[...,None]],2)
-        i = imshow(im,extent=self.extent,**k)
+            im = np.float32(im)
+            if domask: im = np.concatenate([im[...,:3],immask[...,None]],2)
+        i = plt.imshow(im,extent=self.extent,**k)
         noxyaxes()
-        if domask:plot(*self.perim_m.T,color=color,lw=lw)
+        if domask: plot(*self.perim_m.T,color=color,lw=lw)
         ylim(ylim()[::-1])
         return i
     def make_mask(self,H,W):
-        x  = linspace(0,1,W)
-        y  = linspace(0,1,H)
+        x  = np.linspace(0,1,W)
+        y  = np.linspace(0,1,H)
         zg = (x[None,:]+1j*y[:,None]).ravel()
         return is_in_hull(c2p(zg),self.hull).reshape(H,W)
     
@@ -184,9 +191,9 @@ class Dataset:
             y (ndarray): ``y`` position.
             spikes (ndarray): Spike counts for each position sample.
         '''
-        x,y = float32(x).ravel(), float32(y).ravel()
-        spikes = float32(spikes).ravel()
-        if not shape(x)==shape(y)==shape(spikes):
+        x,y = np.float32(x).ravel(), np.float32(y).ravel()
+        spikes = np.float32(spikes).ravel()
+        if not np.shape(x)==np.shape(y)==np.shape(spikes):
             raise ValueError(
             '(x,y,spikes) should be arrays with the same size.')
         self.xy     = (x,y)
@@ -216,9 +223,9 @@ class Dataset:
         NSAMPLES            = len(head_direction_deg)
         # Bin spikes with linear interpolation
         it,ft  = divmod(spike_times_seconds/dt,1)
-        wt     = concatenate([1-ft,ft])
-        qt     = concatenate([it,it+1])
-        spikes = float32(histogram(qt,arange(NSAMPLES+1),density=0,weights=wt)[0])
+        wt     = np.concatenate([1-ft,ft])
+        qt     = np.concatenate([it,it+1])
+        spikes = np.float32(np.histogram(qt,np.arange(NSAMPLES+1),density=0,weights=wt)[0])
         # Repair defects in position tracking
         px,py = xy_position_meters.T
         zx,zy = patch_position_data(px,py,delta_threshold=dt)
@@ -252,9 +259,9 @@ class Dataset:
     def update_counts(self,N,K,P=None):
         self.N = N # seconds/bin
         self.K = K # spikes/bin
-        self.Y = float32(sdiv(K,N)) # spikes/s/bin
+        self.Y = np.float32(sdiv(K,N)) # spikes/s/bin
         P,V,angle = self.heuristic_parameters(N,K,P)
-        sigma = P/pi/sqrt(2)
+        sigma = P/np.pi/np.sqrt(2)
         self.kderate    = kde(N,K,sigma)
         self.prior_mean = slog(kde(N,K,sigma*5))
         self.kdelograte = slog(self.kderate)-self.prior_mean
@@ -264,20 +271,20 @@ class Dataset:
     def heuristic_parameters(self,N,K,P=None):
         if P is None:
             λ = kde(N,K,2)*self.arena.mask
-            P = mean(racperiod(λ,self.arena.mask))
-        sigma = P/pi/sqrt(2)
+            P = np.mean(racperiod(λ,self.arena.mask))
+        sigma = P/np.pi/np.sqrt(2)
         kderate    = kde(N,K,sigma)
         prior_mean = slog(kde(N,K,sigma*5))
         kdelograte = slog(kderate)-prior_mean
-        V = var(kdelograte[self.arena.mask])
+        V = np.var(kdelograte[self.arena.mask])
         z = fftfreqn(self.shape,shift=True)@[1,1j]
-        r = abs(z)
+        r = np.abs(z)
         h = np.angle(z)
         r0 = P/(2*np.pi/jn_zeros(1,2)[-1] )
-        d = sqrt(2)/2 + 1e-9
+        d = np.sqrt(2)/2 + 1e-9
         m = (r>=(r0-d))&(r<=(r0+d))
         c = fft_acorr(kderate)
-        h = np.angle(sum(c*m*exp(6j*h)))%(pi/3)
+        h = np.angle(np.sum(c*m*np.exp(6j*h)))%(np.pi/3)
         angle = h
         return P,V,angle
     def smoothed_position(self,Fl=2.0):
@@ -295,17 +302,17 @@ class Dataset:
         x,y = patch_position_data(xr,yr)
         dx = SGdifferentiate(x,winlength,Fl,Fs)
         dy = SGdifferentiate(y,winlength,Fl,Fs)
-        h  = angle(dx+1j*dy)
+        h  = np.angle(dx+1j*dy)
         return h
     def smoothed_head_direction(self,Fl=2.0):
         # Smaller Y is "on top": Flip N/S
-        # Math convention x+iy = exp(iθ)
+        # Math convention x+iy = np.exp(iθ)
         # ESWN = 0 ½π π 3/2π
-        # Note conj() to handle differing conventions
-        hd = conj(exp(1j*self.head_direction_deg*pi/180))
+        # Note np.conj() to handle differing conventions
+        hd = np.conj(np.exp(1j*self.head_direction_deg*np.pi/180))
         cd,sd = patch_position_data(*c2p(hd))
         Fs = self.position_sample_rate
         winlength = int(Fs/Fl*2)
         cd = SGsmooth(cd,winlength,Fl,Fs)
         sd = SGsmooth(sd,winlength,Fl,Fs)
-        return angle(cd + 1j*sd)
+        return np.angle(cd + 1j*sd)

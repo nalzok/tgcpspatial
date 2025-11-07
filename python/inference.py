@@ -1,4 +1,7 @@
-from config import *
+from config import datadir
+from lgcp.data import Dataset
+from lgcp.infer import lgcp2d
+from lgcp.kern import kernelft
 
 fn    = 'r2405_051216b_cell1816.mat'
 data  = Dataset.from_file(datadir+fn).prepare()

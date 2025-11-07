@@ -7,6 +7,7 @@
 
 import numpy as np
 
+
 def SGOrd(m,fc,fs):
     '''
     Compute polynomial order for Savitsky-Golay filter

@@ -6,11 +6,14 @@ Plotting helpers copied from
 routines to reduce notebook clutter.
 """
 
-from pylab import *
-import numpy as np
-import scipy
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
+import scipy
+from matplotlib.pyplot import (axhline, axis, draw, figure, gca, gcf, imshow,
+                               legend, plot, sca, subplot, subplots_adjust,
+                               suptitle, text, title, xlabel, xlim, xticks,
+                               ylabel, ylim, yticks)
 
 # Some custom colors, just for fun! 
 WHITE      = np.float32(mpl.colors.to_rgb('#f1f0e9'))
@@ -57,7 +60,7 @@ def noy():
 def noxyaxes():
     nox(); noy(); noaxis()
 def figurebox(color=(0.6,0.6,0.6)):
-    from matplotlib import pyplot, lines
+    from matplotlib import lines, pyplot
     ax2 = pyplot.axes([0,0,1,1],facecolor=(1,1,1,0))# axisbg=(1,1,1,0))
     x,y = np.array([[0,0,1,1,0], [0,1,1,0,0]])
     line = lines.Line2D(x, y, lw=1, color=color)
@@ -329,8 +332,8 @@ def inference_summary_plot(
 
     sca(ax[1])
     toshow = y*Fs*nanmask
-    vmin,vmax = nanpercentile(toshow,[1,97.5])
-    vmin = floor(vmin*10)/10
+    vmin,vmax = np.nanpercentile(toshow,[1,97.5])
+    vmin = np.floor(vmin*10)/10
     vmax = ceil (vmax*10)/10
     im = plt.imshow(y*Fs,vmin=vmin,vmax=vmax,cmap=cmap,extent=extent)
     title('Rate histogram',pad=0,fontsize=titlesize)
@@ -338,21 +341,21 @@ def inference_summary_plot(
     
     # Add a scale bar
     if draw_scalebar:
-        x0 = where(any(mask,axis=0))[0][0]
+        x0 = np.where(np.any(mask,axis=0))[0][0]
         x1 = x0 + scale*(L+1)
-        y0 = where(any(mask,axis=1))[0][0]-L//25
+        y0 = np.where(np.any(mask,axis=1))[0][0]-L//25
         xscalebar((x0+x1)/2/L,(x1-x0)/L,'1 m',y=y0/L)
     
     # Add color bar with marker for neurons mean-rate
     cax[1] = good_colorbar(vmin,vmax,title='Hz',cmap=cmap,**caxprops)
     sca(cax[1])
-    μy = mean(y[mask])*Fs
+    μy = np.mean(y[mask])*Fs
     #axhline(μy,color='w',lw=0.8)
     #text(xlim()[1]+.6,μy,r'$\langle y \rangle$:%0.2f Hz'%μy,va='center',fontsize=7)
 
     sca(ax[3])
-    #vmin,vmax = nanpercentile(μλ[mask],[.5,99.5])
-    #vmin = floor(vmin*10)/10
+    #vmin,vmax = np.nanpercentile(μλ[mask],[.5,99.5])
+    #vmin = np.floor(vmin*10)/10
     #vmax = ceil (vmax*10)/10
     plt.imshow(
         μλ.reshape(L,L)*nanmask,
@@ -366,10 +369,10 @@ def inference_summary_plot(
     axis('off')
 
     sca(ax[2])
-    toshow = 10*log10(exp(μ-μz)).reshape(L,L)*nanmask
-    vmin,vmax = nanpercentile(toshow,[0,100])
+    toshow = 10*np.log10(np.exp(μ-μz)).reshape(L,L)*nanmask
+    vmin,vmax = np.nanpercentile(toshow,[0,100])
     vmax += (vmax-vmin)*.2
-    vmin = floor(vmin*10)/10
+    vmin = np.floor(vmin*10)/10
     vmax = ceil (vmax*10)/10
     im = plt.imshow(
         toshow,
@@ -384,8 +387,8 @@ def inference_summary_plot(
     
     sca(ax[4])
     toshow = cv*nanmask
-    vmin,vmax = nanpercentile(toshow,[.5,99.5])
-    vmin = floor(vmin*100)/100
+    vmin,vmax = np.nanpercentile(toshow,[.5,99.5])
+    vmin = np.floor(vmin*100)/100
     vmax = ceil (vmax*100)/100
     im = plt.imshow(
         toshow,
@@ -422,11 +425,11 @@ def covellipse_from_points(q,**kwargs):
     Helper to construct covariance ellipse from 
     collection of 2D points ``q`` encoded as complex numbers.
     '''
-    q = q[isfinite(q)]
+    q = q[np.isfinite(q)]
     pxy = c2p(q)
-    μ = mean(pxy,1)
+    μ = np.mean(pxy,1)
     Δ = pxy-μ[:,None]
-    Σ = mean(Δ[:,None,:]*Δ[None,:,:],2)
+    Σ = np.mean(Δ[:,None,:]*Δ[None,:,:],2)
     return p2c(covariance_crosshairs(Σ,**kwargs) + μ[:,None])
 
 def covariance_crosshairs(
@@ -473,7 +476,7 @@ def covariance_crosshairs(
                          'matrix, got %s'%S)
     if mode=='2D':
         # Points in any direction within percentile
-        sigma = sqrt(scipy.stats.chi2.ppf(p,df=2))
+        sigma = np.sqrt(scipy.stats.chi2.ppf(p,df=2))
     elif mode=='1D':
         # Displacement in specific direction within %ile
         sigma = scipy.stats.norm.ppf(p)

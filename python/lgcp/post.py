@@ -6,8 +6,9 @@ posterior rate map returned from Gaussian process inference.
 """
 
 import numpy as np
-from pylab import *
+
 from .data import bin_spikes
+
 
 def findpeaks(q,height_thr=-inf,rclear=1):
     '''
@@ -20,12 +21,12 @@ def findpeaks(q,height_thr=-inf,rclear=1):
         np.bool: 2D boolean mask of pixels that are local maxima.
     '''
     H,W = q.shape[:2]
-    rclear = max(1.0,rclear)
+    rclear = np.max(1.0,rclear)
     # Add padding
-    rpad = max(1,int(np.ceil(rclear)))
+    rpad = np.max(1,int(np.ceil(rclear)))
     Wpad = W+2*rpad
     Hpad = H+2*rpad
-    qpad = zeros((Hpad,Wpad)+q.shape[2:],dtype=q.dtype)
+    qpad = np.zeros((Hpad,Wpad)+q.shape[2:],dtype=q.dtype)
     qpad[rpad:-rpad,rpad:-rpad,...] = q[:,:,...]
     # Only points above the threshold are candidate peaks
     p = q>height_thr
@@ -75,10 +76,10 @@ def interpolate_peaks(
     is3d = len(z.shape)==3
     if not is3d: z = z.reshape(H,W,1)
     if height_thr is None: 
-        height_thr=nanpercentile(z,25)
-    height_thr = max(height_thr, np.min(z)+6*dither)
+        height_thr=np.nanpercentile(z,25)
+    height_thr = np.max(height_thr, np.min(z)+6*dither)
     peaks    = findpeaks(z,height_thr,rclear)
-    ry,rx,rz = where(peaks)
+    ry,rx,rz = np.where(peaks)
     heights  = z[peaks]
     # Use quadratic interpolation to localize peaks
     rx0 = np.clip(rx-1,0,W-1)
@@ -103,8 +104,8 @@ def interpolate_peaks(
     ix  = (rx-( dx*dyy-dy*dxy)*det + 0.5)/W
     iy  = (ry-(-dx*dxy+dy*dxx)*det + 0.5)/H
     bad = (ix<0) | (ix>1-1/W) | (iy<0) | (iy>1-1/H)
-    peaks = float32((iy,ix,rz) if is3d else (iy,ix))
-    order = argsort(-heights[~bad])
+    peaks = np.float32((iy,ix,rz) if is3d else (iy,ix))
+    order = np.argsort(-heights[~bad])
     peaks = peaks[:,~bad][:,order]
     heights = heights[~bad][order]
     return (peaks, heights) if return_heights else peaks

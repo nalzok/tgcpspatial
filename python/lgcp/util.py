@@ -2,27 +2,29 @@
 # -*- coding: UTF-8 -*-
 
 import numpy as np
-from pylab import *
+from numpy.fft import (fft, fft2, fftfreq, fftn, fftshift, ifft, ifft2, ifftn,
+                       ifftshift)
+
 
 def zgrid(W,H=None,):
     if H is None: H=W
-    cw = arange(W)-W//2
-    ch = arange(H)-H//2
+    cw = np.arange(W)-W//2
+    ch = np.arange(H)-H//2
     return 1j*ch[:,None]+cw[None,:]
 def p2c(p):
     p = np.array([*p])
     if np.any(np.iscomplex(p)): return p
-    which = np.where(int32(p.shape)==2)[0][0]
-    p = p.transpose(which,*sorted(list({*arange(len(p.shape))}-{which})))
+    which = np.where(np.int32(p.shape)==2)[0][0]
+    p = p.transpose(which,*sorted(list({*np.arange(len(p.shape))}-{which})))
     return p[0]+1j*p[1]
 def c2p(z):
     z = np.complex64(z)
     if np.any(np.isnan(z)): z[np.isnan(z)] = np.nan*(1+1j)
     return np.array([z.real,z.imag])
 def pdist(x1,x2):
-    x1,x2 = array(x1),array(x2)
+    x1,x2 = np.array(x1),np.array(x2)
     s1,s2 = x1.shape,x2.shape
-    d = abs(x1.ravel()[:,None]-x2.ravel()[None,:])
+    d = np.abs(x1.ravel()[:,None]-x2.ravel()[None,:])
     return d.reshape((s1+s2))
 
 ############################################################
@@ -30,8 +32,8 @@ def outerslice(D,d):
     d = {d} if isinstance(d,int) else {*d}
     return tuple([np.s_[:] if j in d else None for j in range(D)])
 def ndbroadcast(x,d=2):
-    s = int32(np.shape(x))
-    i = where(s==d)[0]
+    s = np.int32(np.shape(x))
+    i = np.where(s==d)[0]
     if len(i)<=0: raise RuntimeError('No axis length %d'%d)
     i = i[0]
     l = [None,]*len(s)
@@ -52,37 +54,41 @@ def ndouter(*args):
     i = 0
     for a in args:
         n = len(np.shape(a))
-        d = arange(n)+i
+        d = np.arange(n)+i
         result = result*a[outerslice(D,d)]
         i += n
     return result
 ############################################################
 from scipy.linalg import cholesky
 from scipy.linalg.lapack import dtrtri
-def chinv(X,dtype=float32): # inv(x)=C.T@C
+
+
+def chinv(X,dtype=np.float32): # inv(x)=C.T@C
     X = dtype(X)
     X = cholesky(X,lower=True)
     X,info = dtrtri(X,lower=True)
     if info!=0: raise ValueError('lapack.dtrtri: '+(
         'arg %d invalid'%-info if info<0 else 'diagonal element %d is 0'%info))
     return dtype(X)
-from scipy.linalg import solve_triangular as stri 
+from scipy.linalg import solve_triangular as stri
+
+
 def chsolve(H,v):
     C = cholesky(H)
-    return float32(stri(C,stri(C.T,v,lower=True)))
+    return np.float32(stri(C,stri(C.T,v,lower=True)))
 ############################################################
 def sexp(x):
-    return exp(np.clip(x,-10,10,dtype=float32),dtype=float32)
+    return np.exp(np.clip(x,-10,10,dtype=np.float32),dtype=np.float32)
 def slog(x):
-    return log(maximum(1e-10,x,dtype=float32),dtype=float32)
+    return np.log(np.maximum(1e-10,x,dtype=np.float32),dtype=np.float32)
 def ssum(u,**kw):
-    return np.nansum(u,dtype=float32,**kw)
+    return np.nansum(u,dtype=np.float32,**kw)
 def smean(x,*args,default=np.nan,**kwargs):
     if np.size(x)<1: return default
-    return np.nanmean(x,*args,**kwargs)   
+    return np.nanmean(x,*args,**kwargs)
 def sdiv(A,B,fill=0.0,eps=1.0842022e-19,inf=1.8446743e+19):
     A,B = np.array(A), np.array(B,copy=True)
-    assert shape(A)==shape(B)
+    assert np.shape(A)==np.shape(B)
     s,z = np.abs(A)<=eps, np.abs(B)<=eps
     B[z] = 1.0
     x = A/B
@@ -92,6 +98,8 @@ def sdiv(A,B,fill=0.0,eps=1.0842022e-19,inf=1.8446743e+19):
     
 ############################################################
 import time as systime
+
+
 def current_milli_time():
     return int(round(systime.time() * 1000))
 __TIC_TIME__ = None
@@ -140,15 +148,15 @@ def pbar(x,N=None):
 ############################################################
 """
 def zeromean(x, mask=None):
-    x = float32(x)
-    mask = full(x.shape,True) if mask is None else array(mask)>0
-    return (x - nanmean(x.ravel()[mask.ravel()]))*mask
+    x = np.float32(x)
+    mask = np.full(x.shape,True) if mask is None else np.array(mask)>0
+    return (x - np.nanmean(x.ravel()[mask.ravel()]))*mask
 """
 def unitscale(x, mask=None, q0=0,q1=100):
-    x = float32(x)
-    mask = full(x.shape,True) if mask is None else array(mask)>0
-    a,b = nanpercentile(x.ravel()[mask.ravel()],[q0,q1])
-    return clip((x-a)/(b-a),0,1)*mask
+    x = np.float32(x)
+    mask = np.full(x.shape,True) if mask is None else np.array(mask)>0
+    a,b = np.nanpercentile(x.ravel()[mask.ravel()],[q0,q1])
+    return np.clip((x-a)/(b-a),0,1)*mask
 
 ############################################################
 def fftfreqn(shape,shift=False):
@@ -159,17 +167,17 @@ def fftfreqn(shape,shift=False):
         s = fftfreq(L,1/L)
         if shift: s = fftshift(s)
         xy[...,d] = s[outerslice(D,d)]
-    return float32(xy)
+    return np.float32(xy)
 def blurkernel2D(V,W,H=None,normalize=False):
     if H is None: H=W
     V = np.array(V)
-    Λ = eye(2)/V**2 if size(V)==1 else pinv((V + V.T)*.5)
+    Λ = np.eye(2)/V**2 if np.size(V)==1 else np.linalg.pinv((V + V.T)*.5)
     xy = fftfreqn((H,W),True)
     k = np.exp(-0.5*np.einsum('hwd,dD,hwD->hw',xy,Λ,xy))
     if normalize: k /= np.sum(k)
     return ifftshift(k)
 def fftconvf(x,K):
-    if x.shape!=K.shape and size(x)==size(K):
+    if x.shape!=K.shape and np.size(x)==np.size(K):
         x = x.reshape(K.shape)
     assert x.shape==K.shape
     return ifftn(fftn(x)*K).real
@@ -181,21 +189,21 @@ def blur2d(x,V,normalize=False):
     return fftconvx(x,k)
 def fft_upsample_2D(x,factor=4):
     def circle_mask(nr,nc):
-        r = (arange(nr)-(nr-1)/2)/nr
-        c = (arange(nc)-(nc-1)/2)/nc
+        r = (np.arange(nr)-(nr-1)/2)/nr
+        c = (np.arange(nc)-(nc-1)/2)/nc
         z = r[:,None]+c[None,:]*1j
-        return abs(z)<.5
+        return np.abs(z)<.5
     if len(x.shape)==2: x = x.reshape((1,)+x.shape)
     nl,nr,nc = x.shape
     f = fftshift(fft2(x),axes=(-1,-2))
     f = f*circle_mask(nr,nc)
     nr2,nc2 = nr*factor,nc*factor
-    f2 = complex128(zeros((nl,nr2,nc2)))
+    f2 = np.complex128(np.zeros((nl,nr2,nc2)))
     r0 = (nr2+1)//2-(nr+0)//2
     c0 = (nc2+1)//2-(nc+0)//2
     f2[:,r0:r0+nr,c0:c0+nc] = f
-    x2 = real(ifft2(fftshift(f2,axes=(-1,-2))))
-    return squeeze(x2)*factor**2
+    x2 = np.real(ifft2(fftshift(f2,axes=(-1,-2))))
+    return np.squeeze(x2)*factor**2
 def kde(N,K,sigma):
     '''
     Estimate rate using Gaussian KDE smoothing. 
@@ -208,16 +216,16 @@ def kde(N,K,sigma):
     '''
     H,W = N.shape
     assert K.shape==N.shape
-    μ = sum(K)/sum(N)
+    μ = np.sum(K)/np.sum(N)
     N = blur2d(N,sigma)+0.5
     K = blur2d(K,sigma)+0.5*μ
     Y = K/N
-    assert all(isfinite(Y))
+    assert np.all(np.isfinite(Y))
     return Y
 
 ############################################################
 def dyo(shape):
-    dy = zeros(shape,dtype=float32)
+    dy = np.zeros(shape,dtype=np.float32)
     dy[0, 1]=-.5
     dy[0,-1]= .5
     return dy
@@ -231,11 +239,11 @@ def hessian_2D(q):
     dxx = fftconvf(q,fx*fx)
     dxy = fftconvf(q,fy*fx)
     dyy = fftconvf(q,fy*fy)
-    return array([[dxx,dxy],[dxy,dyy]]).transpose(2,3,0,1)
+    return np.array([[dxx,dxy],[dxy,dyy]]).transpose(2,3,0,1)
 def h2f_2d_truncated(u,shape,use2d):
-    f1 = zeros((*shape,)+u.shape[1:],dtype=float32)
+    f1 = np.zeros((*shape,)+u.shape[1:],dtype=np.float32)
     f1[use2d,...] = u
-    f2 = empty(f1.shape,dtype=float32)
+    f2 = np.empty(f1.shape,dtype=np.float32)
     f2[0 ,0 ,...] = f1[0 ,0 ,...]
     f2[1:,1:,...] = f1[1:,1:,...][::-1,::-1,...]
     f2[0 ,1:,...] = f1[0 ,1:,...][::-1,...]
@@ -250,7 +258,7 @@ def rgrid(shape,ftstyle=True):
     r2 = np.zeros(shape)
     for d,L in enumerate(shape):
         m = L//2 if ftstyle else 0.5*L
-        r2 += ((arange(L)-m)**2)[outerslice(D,d)]
+        r2 += ((np.arange(L)-m)**2)[outerslice(D,d)]
     return r2**0.5
 def radial_average(q):
     '''
@@ -258,21 +266,21 @@ def radial_average(q):
     Returns: 
         tuple (r,a): Radius (bins) and autocorrelation
     '''
-    q = float32(q)
+    q = np.float32(q)
     H,W = q.shape
-    i = int32(np.round(rgrid(q.shape,True)))
-    r = arange(np.max(i)+1)
-    a = array([smean(q[i==j]) for j in r])
+    i = np.int32(np.round(rgrid(q.shape,True)))
+    r = np.arange(np.max(i)+1)
+    a = np.array([smean(q[i==j]) for j in r])
     return r,a
 def fft_acorr(x,mask=None,window=True):
     H, W = x.shape
-    v0 = var(x) if mask is None else var(x[mask])
+    v0 = np.var(x) if mask is None else np.var(x[mask])
     if mask is None:
-        x = x - mean(x)
+        x = x - np.mean(x)
     else:
-        x = (x - mean(x[mask])) * mask
-    x   = x*outer(hanning(H),hanning(W))
-    psd = abs(fft2(x))**2/(W*H)
+        x = (x - np.mean(x[mask])) * mask
+    x   = x*np.outer(np.hanning(H),np.hanning(W))
+    psd = np.abs(fft2(x))**2/(W*H)
     acr = fftshift(ifft2(psd).real)
     acr = acr*v0/np.max(acr)
     return acr
@@ -280,22 +288,24 @@ def rac(y,mask=None):
     '''Radial autocorrelation of a 2D signal.'''
     return radial_average(fft_acorr(y,mask))
 from scipy.signal import find_peaks
+
+
 def racpeak(a,upsample=6):
     '''First autocorrelogram peak at nonzero lag.'''
     a2 = fft_upsample_1D(a,upsample)
     peaks = find_peaks(a2)[0]
-    return min(peaks)/upsample if len(peaks) else nan
+    return np.min(peaks)/upsample if len(peaks) else np.nan
 def ractrough(a,upsample=6):
     a2 = fft_upsample_1D(a,upsample)
     peaks = find_peaks(-a2)[0]
-    return min(peaks)/upsample if len(peaks) else nan
+    return np.min(peaks)/upsample if len(peaks) else np.nan
 def fft_upsample_1D(x,factor=4,circular=False):
     '''Upsample 1D array using the FFT.'''
     assert np.all(np.isfinite(x))
     n  = len(x)
     n2 = n*factor
     if circular: 
-        f  = fftshift(fft(x))*hanning(n)
+        f  = fftshift(fft(x))*np.hanning(n)
         f2 = np.complex128(np.zeros(n2))
         r0 = (n2+1)//2-(n+0)//2
         f2[r0:r0+n] = f
@@ -305,6 +315,8 @@ def fft_upsample_1D(x,factor=4,circular=False):
         x = fft_upsample_1D(x,factor,True)
         return x[n2:]
 from scipy.special import jn_zeros
+
+
 def racperiod(x, mask=None, res=50):
     r,a = rac(x,mask)      # radial acorr
     Pp  = racpeak(a,res)   # bins to 1st peak
@@ -316,6 +328,8 @@ def racperiod(x, mask=None, res=50):
     
 ############################################################
 from scipy.spatial import ConvexHull
+
+
 def points_to_qhull(px,py):
     # Encircle points in a convex hull
     points = np.array([px,py]).T
@@ -386,9 +400,12 @@ def extend_mask(mask,radius):
 
 ############################################################
 import os
-import multiprocess as multi
 import traceback
-from   threadpoolctl import threadpool_info,threadpool_limits
+
+import multiprocess as multi
+from threadpoolctl import threadpool_info, threadpool_limits
+
+
 def limit_cores(CORES_PER_THREAD=1): 
     keys = ['MKL_NUM_THREADS','NUMEXPR_NUM_THREADS',
         'OMP_NUM_THREADS ','OPENBLAS_NUM_THREADS',
@@ -426,7 +443,7 @@ def ideal_hex_grid(L,P):
     '''
     θs = np.exp(1j*np.float32([0,np.pi/3,2*np.pi/3]))
     coords = zgrid(L)
-    return sum(
+    return np.sum(
         np.float32([np.cos((θ*coords).real*2*np.pi/P) 
         for θ in θs]),0)
 
@@ -445,15 +462,17 @@ def ndpoints(a,d=2):
         if not d==1: raise ValueError(
             'Cannot interpret 1D array as %d-d points'%d)
         return a.reshape(1,len(a))
-    if sum(s==d)<1: raise ValueError(
+    if np.sum(s==d)<1: raise ValueError(
         'Array needs at least one axis dimension %d'%d)
-    if sum(s==d)>2: raise ValueError((
+    if np.sum(s==d)>2: raise ValueError((
         'Array shape %s has multiple lenght-%d dimensions, '
         'cannot unambiguously determine which axis has '
         'point coordinates.')%(s,d))
     i = np.where(s==d)[0][0]
-    return a.transpose(i,*sorted([*({*arange(n)}-{i})]))
+    return a.transpose(i,*sorted([*({*np.arange(n)}-{i})]))
 import itertools
+
+
 def bin_points(p,shape,w=None,wrap=None,method='linear'):
     '''
     Bin points, using linear interpolation to distribute 
@@ -477,10 +496,10 @@ def bin_points(p,shape,w=None,wrap=None,method='linear'):
     D = len(shape)
     # Implement wrapping by adding bin and removing later
     if wrap is None:   wrap = False
-    if isscalar(wrap): wrap = [float32(wrap)!=0,]*D
-    wrap = float32(wrap)!=0
+    if np.isscalar(wrap): wrap = [np.float32(wrap)!=0,]*D
+    wrap = np.float32(wrap)!=0
     assert len(wrap)==D
-    oldshape = int32(shape)
+    oldshape = np.int32(shape)
     shape = [i+1 if w else i for (i,w) in zip(shape,wrap)]
     # Clean up point data
     p = ndpoints(p,D)
@@ -513,7 +532,7 @@ def bin_points(p,shape,w=None,wrap=None,method='linear'):
             qd = np.zeros((2,)*D+(N,))
             sl = [np.s_[:] if d==j else None for j in range(D)]
             sl = tuple(sl)+(np.s_[:],)
-            qd = q0*float32([ip,ip+1])[sl]
+            qd = q0*np.float32([ip,ip+1])[sl]
             q.append(qd)
             # Fractional weights
             b.append(fp)
@@ -525,13 +544,13 @@ def bin_points(p,shape,w=None,wrap=None,method='linear'):
         ab = [1.0-b,b]
         # All weight combinations
         z = []
-        combos = int32([*itertools.product(*[(0,1)]*D)])
+        combos = np.int32([*itertools.product(*[(0,1)]*D)])
         for combo in combos:
             x = [ab[j][d] for d,j in enumerate(combo)]
-            x = float32(x)
+            x = np.float32(x)
             x = np.prod(x,axis=0)
             z.append(x)
-        z = float32(z).ravel()
+        z = np.float32(z).ravel()
         # Needs N × D shape
         bins = [np.arange(L+1) for L in shape]
         z *= np.concatenate((w,)*(2**D))
@@ -539,27 +558,27 @@ def bin_points(p,shape,w=None,wrap=None,method='linear'):
     else: raise ValueError(
         'method should be "linear" or "nearest"')
     # Handle wrapped variables
-    for d in where(wrap)[0]:
+    for d in np.where(wrap)[0]:
         N[sliceat(D,d,0)] += N[sliceat(D,d,-1)]
     N = N[truncateslice(oldshape)]
     return N
     
 def bin_spikes(px,py,s,shape,w=None):
-    s = float32(s)
-    w = ones(s.shape) if w is None else float32(w)
+    s = np.float32(s)
+    w = np.ones(s.shape) if w is None else np.float32(w)
     p = [py,px]
     N = bin_points(p,shape,w=w)
     K = bin_points(p,shape,w=w*s)
     return N,K
 def get_edges(signal,pad_edges=True):
     if len(signal)<1:
-        return array([[],[]])
-    if tuple(sorted(unique(signal)))==(-2,-1):
+        return np.array([[],[]])
+    if tuple(sorted(np.unique(signal)))==(-2,-1):
         raise ValueError('signal should be bool or int∈{0,1};'+
             ' (using ~ on an int array?)')
-    signal = int32(np.bool(signal))
-    starts = list(where(diff(int32(signal))==1)[0]+1)
-    stops  = list(where(diff(int32(signal))==-1)[0]+1)
+    signal = np.int32(np.bool(signal))
+    starts = list(np.where(np.diff(np.int32(signal))==1)[0]+1)
+    stops  = list(np.where(np.diff(np.int32(signal))==-1)[0]+1)
     if pad_edges:
         # Add artificial start/stop time to incomplete blocks
         if signal[0 ]: starts = [0]   + starts
@@ -568,26 +587,26 @@ def get_edges(signal,pad_edges=True):
         # Remove incomplete blocks
         if signal[0 ]: stops  = stops[1:]
         if signal[-1]: starts = starts[:-1]
-    return array([array(starts), array(stops)])
+    return np.array([np.array(starts), np.array(stops)])
 def interpolate_nan(u):
-    u = array(u)
-    for s,e in zip(*get_edges(~isfinite(u))):
+    u = np.array(u)
+    for s,e in zip(*get_edges(~np.isfinite(u))):
         if s==0: 
             u[:e+1] = u[e+1]
         elif e==len(u): 
             u[s:] = u[s-1]
         else:
             a,b = u[s-1],u[e]
-            u[s:e+1] = a+(b-a)*linspace(0,1,e-s+1)
-    u[~isfinite(u)] = mean(u[isfinite(u)])
+            u[s:e+1] = a+(b-a)*np.linspace(0,1,e-s+1)
+    u[~np.isfinite(u)] = np.mean(u[np.isfinite(u)])
     return u
 def patch_position_data(px,py,delta_threshold=0.01):
     '''Interpolate across glitches in tracked position.'''
     pz = px + 1j*py
-    bad = where(abs(diff(pz))>delta_threshold)[0]
-    pz[bad]=nan
+    bad = np.where(np.abs(np.diff(pz))>delta_threshold)[0]
+    pz[bad]=np.nan
     z = interpolate_nan(pz)
-    assert all(isfinite(z))
+    assert np.all(np.isfinite(z))
     return z.real,z.imag
 
 

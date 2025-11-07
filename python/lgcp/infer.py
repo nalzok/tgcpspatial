@@ -1,19 +1,13 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
-"""
-from .util import *
-from .kern import *
-from .data import Dataset
-from numpy import *
-from numpy.random import randn
-"""
+
+from typing import NamedTuple
 
 import numpy as np
-from pylab import *
-from .util import *
+from numpy.fft import fft, fftn, ifftn
+from scipy.sparse.linalg import LinearOperator, minres
 
-from scipy.sparse.linalg import minres,LinearOperator
-
+from .util import chinv, outerslice, sdiv, sexp, slog, ssum
 
 
 def coordinate_descent(μ,v,
@@ -44,25 +38,25 @@ def coordinate_descent(μ,v,
 
 
 def RI(x,rtype=np.float32):
-    return float32(real(x)+imag(x))
+    return np.float32(np.real(x)+np.imag(x))
 
 
 def get_hartley_components(mask):
-    h = mask.shape    
+    h = mask.shape
     D = len(h)
     # Construct Fourier components as Π over 1D
-    s = {*arange(D)}
+    s = {*np.arange(D)}
     U = [np.any(mask,tuple([*(s-{i})])) for i in range(D)]
     # FFT each ROW
-    ff = [fft(eye(L),axis=0,norm='ortho')[u] for L,u in zip(h,U)]
+    ff = [fft(np.eye(L),axis=0,norm='ortho')[u] for L,u in zip(h,U)]
     # Index lookup for kept components in each dimension
-    fi = [cumsum(u)-1 for u in U]
+    fi = [np.cumsum(u)-1 for u in U]
     sl = [outerslice(D,d) for d in range(D)]
     rr = []
-    for ii in int32(where(mask)).T:
+    for ii in np.int32(np.where(mask)).T:
         ii = [ix[i] for i,ix in zip(ii,fi)]
         fc = [fj[i] for i,fj in zip(ii,ff)]
-        r = array(fc[0],copy=True)[sl[0]]
+        r = np.array(fc[0],copy=True)[sl[0]]
         for d in range(1,D):
             r = r*fc[d][sl[d]]
         rr.append(r)
@@ -92,45 +86,45 @@ def lgcpnd(kf,N,K,z0f,zh0,vh0,eps=1e-5,mintol=1e-5,maxcomponents=1000,**opts):
     SHAPE = N.shape
     nmask = N>0     # Mask where observations exist
     kept  = kf>0    # Mask for retained Fourier components
-    if sum(kept)>maxcomponents: raise ValueError((
+    if np.sum(kept)>maxcomponents: raise ValueError((
         '%d nonzero kernel Fourier components; This is a '
         'lot. Ensure that excluded components are zeroed-'
-        'out in the provided kernel Fourier transform')%sum(kept))
+        'out in the provided kernel Fourier transform')%np.sum(kept))
     def unmask(u,mask):
-        x = zeros(mask.shape,'f')
-        x[mask] = ravel(u)
+        x = np.zeros(mask.shape,'f')
+        x[mask] = np.ravel(u)
         return x
     def maskin(u,mask):
         return u.reshape(mask.shape)[mask]
-    ten = lambda x:float32(x).reshape(SHAPE)
+    ten = lambda x:np.float32(x).reshape(SHAPE)
     So  = lambda u:ten(u)[nmask] #full→masked
     St  = lambda u:unmask(u,nmask) #masked→full
-    n   = ravel(N) # visits as a vector
-    y   = ravel(Y) # rates as a vector
-    ny  = n*y      # same as ravel(K)
+    n   = np.ravel(N) # visits as a vector
+    y   = np.ravel(Y) # rates as a vector
+    ny  = n*y      # same as np.ravel(K)
     nm  = So(n)    # nonzero visit counts
     ym  = So(y)    # rates at bins with nonzero visits
     nym = So(ny)   # total counts at bins with nonzero visits
     # Operators between low-rank subspace and (masked)state
-    Gt  = lambda u:ravel(RI(fftn(unmask(u,kept),norm='ortho'))) #loD→mask
-    Go  = lambda u:ravel(RI(fftn(ten(u),norm='ortho')[kept])) #mask→loD
-    Ft  = lambda u:ravel(RI(fftn(unmask(u,kept),norm='ortho')[nmask])) #loD→mask
-    Fo  = lambda u:ravel(RI(fftn(St(u),norm='ortho')[kept])) #mask→loD
+    Gt  = lambda u:np.ravel(RI(fftn(unmask(u,kept),norm='ortho'))) #loD→mask
+    Go  = lambda u:np.ravel(RI(fftn(ten(u),norm='ortho')[kept])) #mask→loD
+    Ft  = lambda u:np.ravel(RI(fftn(unmask(u,kept),norm='ortho')[nmask])) #loD→mask
+    Fo  = lambda u:np.ravel(RI(fftn(St(u),norm='ortho')[kept])) #mask→loD
     # Masked prior log-rate, log-mean guess
-    zhf = ravel(float32(zh0)) # Initial Δ<ln(λ)> from the prior
-    uh  = ravel(Go(zhf))      # Δ<ln(λ)> in low-rank space
-    vhf = ravel(float32(vh0)) # Initial log-rate marginal variances, full spatial domain
+    zhf = np.ravel(np.float32(zh0)) # Initial Δ<ln(λ)> from the prior
+    uh  = np.ravel(Go(zhf))      # Δ<ln(λ)> in low-rank space
+    vhf = np.ravel(np.float32(vh0)) # Initial log-rate marginal variances, full spatial domain
     vh  = So(vhf)             # log-rate marginal variances for bins with data
     z0  = So(z0f)             # prior mean-log-rate in spatial domain bins with data
     # Low-rank kernel, inverse, truncated Fourier components
     kx = ifftn(kf,norm='ortho').real
-    Kh = ravel(maximum(Go(kx),eps))
+    Kh = np.ravel(np.maximum(Go(kx),eps))
     Λh = 1/Kh
     Gm = get_hartley_components(kept)
     Fm = Gm[:,nmask.ravel()]
     # Preconditioner and constant terms in loss
-    R  = size(Kh)
-    Mu = lambda u:Kh*ravel(u)
+    R  = np.size(Kh)
+    Mu = lambda u:Kh*np.ravel(u)
     M  = LinearOperator((R,R),Mu,Mu,dtype=np.float32)
     ldΣz = -ssum(slog(Λh)) # ln|Σ₀|
     ll0  = .5*(ldΣz-R)
@@ -143,23 +137,23 @@ def lgcpnd(kf,N,K,z0f,zh0,vh0,eps=1e-5,mintol=1e-5,maxcomponents=1000,**opts):
         uΛu  =  ssum(uh**2*Λh)      #  μ'Λ₀μ
         C    = _C(uh,vh)
         trΛΣ =  ssum(C**2*Λh)       #  tr[Λ₀Σ]
-        ldΣq =  ssum(slog(diag(C))) # -ln|Σ|
+        ldΣq =  ssum(slog(np.diag(C))) # -ln|Σ|
         return ll0 + nyr + .5*(uΛu + trΛΣ) - ldΣq
     def meanupdate(uh,vh):
         nr = _nr(uh,vh)
         J  = Λh*uh + Fo(nr-nym)
         Hu = lambda u: Λh*u + Fo(nr*(Ft(u)))
         Hv = LinearOperator((R,R),Hu,Hu,dtype=np.float32)
-        return -float32(minres(Hv,J,rtol=mintol,M=M)[0])
+        return -np.float32(minres(Hv,J,rtol=mintol,M=M)[0])
     def _C(uh,vh): # Cholesky factor of covariance
-        x = sqrt(_nr(uh,vh))[None,:]*Fm
-        return chinv(diag(Λh) + x@x.T)
+        x = np.sqrt(_nr(uh,vh))[None,:]*Fm
+        return chinv(np.diag(Λh) + x@x.T)
     def varupdate(uh,vh):
         return np.sum((Fm.T@_C(uh,vh))**2,1,'f')-vh
     def unpack(uh,vh):
         '''Unpack low-d mean, sparse marginal variance.'''
-        x = sqrt(_nr(uh,vh),dtype='f')[None,:]*Fm
-        C = chinv(diag(Λh) + x@x.T)
+        x = np.sqrt(_nr(uh,vh),dtype='f')[None,:]*Fm
+        C = chinv(np.diag(Λh) + x@x.T)
         v = np.sum((Gm.T@C)**2,1,'f') # Full posterior log-rate variance
         z = Gt(uh)        # full Δ mean-log-rate 
         μ = z + z0f       # full posterior mean-log-rate
@@ -169,13 +163,13 @@ def lgcpnd(kf,N,K,z0f,zh0,vh0,eps=1e-5,mintol=1e-5,maxcomponents=1000,**opts):
         nonlocal uh,vh
         if uho is None: uho = uh
         if vho is None: vho = vh
-        du =_C(uho,vho)@float32(randn(R,nsamples))
+        du =_C(uho,vho)@np.float32(np.random.randn(R,nsamples))
         u  = uho[:,None] + du
-        z  = zeros(SHAPE+(nsamples,))
+        z  = np.zeros(SHAPE+(nsamples,))
         z[kept,:] = u
-        z = RI(fftn(z,norm='ortho',axes=arange(len(SHAPE))))
+        z = RI(fftn(z,norm='ortho',axes=np.arange(len(SHAPE))))
         return z + ten(z0f)[...,None]
-    uh = ravel(Go(zhf))
+    uh = np.ravel(Go(zhf))
     vh = So(vhf)
     uh,vh = coordinate_descent(uh,vh,meanupdate,varupdate,**opts)
     z,r,v,μ = unpack(uh,vh) 
@@ -188,7 +182,6 @@ def lgcpnd(kf,N,K,z0f,zh0,vh0,eps=1e-5,mintol=1e-5,maxcomponents=1000,**opts):
     return InferResult(state, -loss(uh,vh), info), ClosureObject(locals())
 
 
-from typing import NamedTuple
 class InferState(NamedTuple):
     '''full posterior log-rate'''
     z:np.ndarray
@@ -229,15 +222,15 @@ def lgcp2d(kf,N,K,prior_mean,initial_guess=(None,None),**opts):
     Returns:
         tuple: (InferResult,model)
     '''
-    N,K,kf = map(float32,(N,K,kf))
+    N,K,kf = map(np.float32,(N,K,kf))
     assert N.shape==K.shape==kf.shape==prior_mean.shape
     # Priors z0, initial guess zh, masked & low-rank counterparts
-    z0f = ravel(float32(prior_mean))
+    z0f = np.ravel(np.float32(prior_mean))
     # initial log-mean and marginal variance guesses
     zh0,vh0 = (None,None) if initial_guess is None else initial_guess
-    if zh0 is None: zh0 = zeros(size(N),'f')
-    if vh0 is None: vh0 = zeros(size(N),'f') 
-    assert size(zh0)==size(vh0)==size(N)
+    if zh0 is None: zh0 = np.zeros(np.size(N),'f')
+    if vh0 is None: vh0 = np.zeros(np.size(N),'f')
+    assert np.size(zh0)==np.size(vh0)==np.size(N)
     return lgcpnd(kf,N,K,z0f,zh0,vh0,**opts)
 
 
@@ -255,24 +248,24 @@ def lgcpheading(kf,N,K,prior_mean,initial_guess=(None,None),**opts):
     Returns:
         tuple: (InferResult,model)
     '''
-    N,K,kf = map(float32,(N,K,kf))
+    N,K,kf = map(np.float32,(N,K,kf))
     assert N.shape==K.shape==kf.shape
     D,H,W = N.shape
     # Priors z0 and initial guesses zh, and their masked and low-rank counterparts
-    h0 = ones(D,'f') # No prior opinion on heading tuning
+    h0 = np.ones(D,'f') # No prior opinion on heading tuning
     # prior log-rate
-    if   size(prior_mean)==H*W:   z0f = ravel(ndouter(h0,prior_mean)) 
-    elif size(prior_mean)==D*H*W: z0f = ravel(float32(prior_mean))
+    if   np.size(prior_mean)==H*W:   z0f = np.ravel(ndouter(h0,prior_mean))
+    elif np.size(prior_mean)==D*H*W: z0f = np.ravel(np.float32(prior_mean))
     else: assert 0
     # initial log-mean and marginal variance guesses
     zh0,vh0 = (None,None) if initial_guess is None else initial_guess
-    if zh0 is None:        zhf = zeros(N.shape,'f')
-    elif size(zh0)==H*W:   zhf = ravel(ndouter(h0,zh0))
-    elif size(zh0)==D*H*W: zhf = ravel(float32(zh0))
+    if zh0 is None:        zhf = np.zeros(N.shape,'f')
+    elif np.size(zh0)==H*W:   zhf = np.ravel(ndouter(h0,zh0))
+    elif np.size(zh0)==D*H*W: zhf = np.ravel(np.float32(zh0))
     else: assert 0
-    if vh0 is None:        vhf = zeros(N.shape,'f') 
-    elif size(vh0)==H*W:   vhf = ravel(ndouter(h0,vh0))
-    elif size(vh0)==D*H*W: vhf = ravel(float32(vh0))
+    if vh0 is None:        vhf = np.zeros(N.shape,'f')
+    elif np.size(vh0)==H*W:   vhf = np.ravel(ndouter(h0,vh0))
+    elif np.size(vh0)==D*H*W: vhf = np.ravel(np.float32(vh0))
     else: assert 0
     return lgcpnd(kf,N,K,z0f,zhf,vhf,**opts)
 

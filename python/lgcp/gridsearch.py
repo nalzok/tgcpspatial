@@ -6,10 +6,15 @@ from matplotlib import *
 from matplotlib.pyplot import *
 """
 
-import numpy as np
-from pylab import *
-
 from typing import NamedTuple
+
+import numpy as np
+
+from .infer import lgcp2d
+from .kern import kernelft
+from .util import parmap
+
+
 class GridsearchResult(NamedTuple):
     '''best index into parameter grid''' 
     best: np.ndarray
@@ -101,8 +106,8 @@ def grid_search(
     # Tell me which parameters were the best, so far
     def current_best():
         nonlocal results
-        ll = array([-inf if r is None else r[1] for r in results.ravel()])
-        return unravel_index(argmax(ll),results.shape), np.max(ll)
+        ll = np.array([-np.inf if r is None else r[1] for r in results.ravel()])
+        return np.unravel_index(np.argmax(ll),results.shape), np.max(ll)
 
     # Bounds test for grid search
     ingrid = lambda ix:all([i>=0 and i<Ni for i,Ni in zip(ix,gridshape)])
@@ -130,17 +135,17 @@ def grid_search(
         Δs = set()
         for i in range(NPARAMS):
             for d in [-1,1]:
-                Δ = zeros(NPARAMS,'int32')
+                Δ = np.zeros(NPARAMS,'int32')
                 Δ[i] += d
                 Δs.add(tuple(Δ))
         if not suggested_direction is None:
             Δ = suggested_direction
             if current_best()[0]==index:
-                search(int32(index)+Δ,Δ)
+                search(np.int32(index)+Δ,Δ)
                 Δs -= {tuple(Δ)}
         for Δ in Δs:
             if current_best()[0]!=index: break
-            search(int32(index)+Δ,Δ)
+            search(np.int32(index)+Δ,Δ)
         return
             
     search(pari)
@@ -151,9 +156,11 @@ def grid_search(
     return GridsearchResult(best,pars,results[best],results,pargrid)
 
 
-from .util import parmap
 from .infer import lgcp2d
 from .kern import kernelft
+from .util import parmap
+
+
 def optimize_PVtheta(N,K,prior_mean,P,V,
     rp = 2 , # Range (ratio) to search for optimal period
     rv = 10, # Range (ratio) to search for optimal kernel height
@@ -162,9 +169,9 @@ def optimize_PVtheta(N,K,prior_mean,P,V,
     Nθ = 60, # Angles to test
     ):
     # Prepare hyperparameter grid
-    Ps = float32(exp(linspace(log(P/rp),log(P*rp),Np)))
-    Vs = float32(exp(linspace(log(V/rv),log(V*rv),Nv))[::-1])
-    θs = linspace(0,pi/3,Nθ+1)[:Nθ]
+    Ps = np.float32(np.exp(np.linspace(np.log(P/rp),np.log(P*rp),Np)))
+    Vs = np.float32(np.exp(np.linspace(np.log(V/rv),np.log(V*rv),Nv))[::-1])
+    θs = np.linspace(0,np.pi/3,Nθ+1)[:Nθ]
     # Period and variance
     NKμ = (N,K,prior_mean)
     def gcloss(pars, state):
@@ -179,12 +186,12 @@ def optimize_PVtheta(N,K,prior_mean,P,V,
         return lgcp2d(kernel,*NKμ)[0]
     results = parmap(angle_helper,θs)
     allzv, nll, λv = zip(*results)
-    i = argmax(nll)
+    i = np.argmax(nll)
     θ = θs[i]
     print('Optimized parameters:')
     print('P = %f'%P)
     print('V = %f'%V)
-    print('θ = %f°'%(θ*180/pi))
+    print('θ = %f°'%(θ*180/np.pi))
     return (P, V, θ), results[i]
 
 

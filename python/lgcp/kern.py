@@ -1,7 +1,11 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
-from .util import *
-from scipy.special import j0
+import numpy as np
+from numpy.fft import fft2, fftn, fftshift, ifft2, ifftn, ifftshift
+from scipy.special import j0, jn_zeros
+
+from .util import blur2d, c2p, outerslice, p2c, zgrid
+
 
 def ensurePSD(kern,eps=0.0):
     assert eps>=0
@@ -89,44 +93,44 @@ def grid_kernel(
     if P<2:
         raise ValueError('Nyquist: P=%s cannot be <2 px'%P)
     
-    scale = 2*pi/P
+    scale = 2*np.pi/P
     B     = np.linalg.pinv([[*ex],[*ey]])
-    pxy   = zgrid(W,H)*(exp(1j*angle)*scale)
+    pxy   = zgrid(W,H)*(np.exp(1j*angle)*scale)
     pxy   = p2c(np.einsum('ab,bwh->awh',B,c2p(pxy)))
-    r     = abs(pxy)
+    r     = np.abs(pxy)
 
     style = str(style).lower()
     if style=='radial':
         kern = j0(r)
     elif style=='grid':
-        component1 = cos(real(pxy))
-        component2 = cos(real(pxy*exp(1j*(pi/3))))
-        component3 = cos(real(pxy*exp(1j*(-pi/3))))
+        component1 = np.cos(np.real(pxy))
+        component2 = np.cos(np.real(pxy*np.exp(1j*(np.pi/3))))
+        component3 = np.cos(np.real(pxy*np.exp(1j*(-np.pi/3))))
         kern = component1 + component2 + component3  
     elif style=='band':
-        kern = cos(real(pxy))
+        kern = np.cos(np.real(pxy))
     elif style=='square':
-        component1 = cos(real(pxy))
-        component2 = cos(real(pxy*exp(1j*(pi/2))))
+        component1 = np.cos(np.real(pxy))
+        component2 = np.cos(np.real(pxy*np.exp(1j*(np.pi/2))))
         kern = component1 + component2
     elif style=='rbf':
-        kern = exp(-0.25*(r)**2)
+        kern = np.exp(-0.25*(r)**2)
         doblur = False
     else: 
         raise ValueError('Style %s not implemented'%str(style))
     
     # Windowing to avoid ringing in FT
-    kern *= outer(hanning(H),hanning(W))
+    kern *= np.outer(np.hanning(H),np.hanning(W))
     kern = ifftshift(kern)
     r = ifftshift(r)
     # Local neighborhood window
     if doclip and not (k is None or window is None):
         cutoff = jn_zeros(0,k)[-1]#/scale
         if window=='gaussian':
-            sigma = cutoff/sqrt(2)
-            clip  = exp(-0.5*(r/sigma)**2)
+            sigma = cutoff/np.sqrt(2)
+            clip  = np.exp(-0.5*(r/sigma)**2)
         elif window=='parzen':
-            disk  = r<cutoff/sqrt(2)
+            disk  = r<cutoff/np.sqrt(2)
             clip  = ifft2(fft2(disk)**4).real
         elif window=='triangle':
             disk  = r<cutoff
@@ -138,14 +142,14 @@ def grid_kernel(
         kern *= clip
 
     if doblur:
-        kern = blur2d(kern,(P/pi)/sqrt(2))
+        kern = blur2d(kern,(P/np.pi)/np.sqrt(2))
     if normalize:
         kern = kern/np.max(kern)
     kern = ensurePSD(kern,eps)
     return kern
 
 def truncate(kf,wn=0.0,eth=0.1):
-    if size(kf)>1:
+    if np.size(kf)>1:
         kept = kf >= np.max(kf.ravel()[1:])*eth
     else: kept = np.full(kf.shape,True)
     return (kf + wn)*kept
@@ -159,7 +163,7 @@ def kernelft(shape,P=None,V=1.0,angle=0.0,dc=1e3,wn=0,eth=0.1,kept=None,**kw):
     if kept is None: 
         return truncate(kf,wn,eth)
     else: 
-        kept = float32(kept>0)
+        kept = np.float32(kept>0)
         return (kf + wn)*kept
 
 

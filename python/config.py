@@ -5,7 +5,9 @@ Matplotlib and numpy configuration
 """
 
 # Relative import regardless of file nesting depth
-import os, sys
+import os
+import sys
+
 path = os.getcwd().split(os.sep)
 while len(path) and path[-1]!='notebooks': path = path[:-1]
 sys.path.append(os.sep.join(path[:-1]))
@@ -18,16 +20,11 @@ fitdir = os.sep.join(path+['hyperparameter_fits',''])
 print('Fitted models in fitdir =',fitdir)
 
 
-import pickle
-import numpy
-from lgcp.data  import *
-from lgcp.kern  import *
-from lgcp.infer import *
-from lgcp.plot  import *
-from lgcp.post  import *
-from lgcp.sg    import *
-from lgcp.gridsearch  import *
 
+import pickle
+
+import matplotlib as mpl
+import numpy as np
 
 # Fonts
 SMALL  = 7
@@ -61,14 +58,14 @@ def configure_pylab():
     mpl.rcParams['xtick.minor.size'] = tl
     mpl.rcParams['ytick.major.size'] = tl
     mpl.rcParams['ytick.minor.size'] = tl
-    numpy.seterr(all='ignore')
-    numpy.set_printoptions(precision=10)
-    numpy.seterr(divide='ignore', invalid='ignore');
+    np.seterr(all='ignore')
+    np.set_printoptions(precision=10)
+    np.seterr(divide='ignore', invalid='ignore');
 configure_pylab();
 
 
 # Heading plot configuration
-colorNSEW = float32([
+colorNSEW = np.float32([
     [0.08,0.40,1.0], # North color
     [0.92,0.60,0.0], # South color
     [0.10,0.85,0.3], # East  color
@@ -76,11 +73,11 @@ colorNSEW = float32([
 ])
 cN,cS,cE,cW = colorNSEW
 hE = 0
-hS = pi/2
-hW = pi
-hN = 3*pi/2
+hS = np.pi/2
+hW = np.pi
+hN = 3*np.pi/2
 NSEW = [hN,hS,hE,hW]
-ESWNmix = mpl.colors.LinearSegmentedColormap.from_list('ESNWmix',float32([
+ESWNmix = mpl.colors.LinearSegmentedColormap.from_list('ESNWmix',np.float32([
     [ 72, 160, 230, 234, 220, 203, 170, 101,  56,  31,  27,  72],
     [194, 175, 155, 132,  93,  72,  75,  98, 128, 159, 193, 194],
     [ 92,  42,  12,  51, 131, 180, 196, 222, 235, 200, 138,  92]]).T/255)
