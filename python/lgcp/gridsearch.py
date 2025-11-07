@@ -16,105 +16,102 @@ from .util import parmap
 
 
 class GridsearchResult(NamedTuple):
-    '''best index into parameter grid''' 
+    """best index into parameter grid"""
+
     best: np.ndarray
-    '''values of best parameters'''
+    """values of best parameters"""
     pars: np.ndarray
-    '''
+    """
     (state, likelihood, info) at best parameters.
     ``info`` is determined by the third element in the
     3-tuple return-value of the ``evaluate`` function,
     passed by the user. ``state`` is also user-defined.
-    '''
-    bestresult: tuple 
-    '''
+    """
+    bestresult: tuple
+    """
     All other results as an object array.
     Grid points that were not evaluated are None.
-    '''
+    """
     allresults: np.ndarray
-    '''Parameter grid that has been searched'''
+    """Parameter grid that has been searched"""
     pargrid: np.ndarray
 
-def grid_search(
-    pargrid,
-    evaluate,
-    verbose=True,
-    **opts
-    ):
-    '''
-    Grid search hyperparameter optimization    
-    
+
+def grid_search(pargrid, evaluate, verbose=True, **opts):
+    """
+    Grid search hyperparameter optimization
+
     Parameters
     ----------
     pargrid: list of arrays
-        A list; Each element is a list of values for a given 
+        A list; Each element is a list of values for a given
         parameter to search over
-    
+
     evaluate: function
         Arguments:
             Parameters: Tuple
-                Parameters taken from the parameter search 
+                Parameters taken from the parameter search
                 grid
             State: List of arrays
-                Saves initial conditions 
+                Saves initial conditions
                 (optional, default None)
         Returns:
-            state: 
-                the inferred model fit, in the form of a 
-                list of floating-point numpy arrays, to be 
-                re-used as initial conditions for 
+            state:
+                the inferred model fit, in the form of a
+                list of floating-point numpy arrays, to be
+                re-used as initial conditions for
                 subsequent parameters.
             likelihood: float
                 Scalar summary of fit quality, higher is better
             info: object
                 Anything else you'd like to save
-    
+
     Other Parameters
     ----------------
     verbose: boolean, default True
         Whether to print progress update
-    
+
     Returns
     -------
-    best: 
+    best:
         best index into parameter grid
-    pars: 
+    pars:
         values of best parameters
-    results[best]: 
+    results[best]:
         (state, likelihood, info) at best parameters.
         ``info`` is determined by the third element in the
         3-tuple return-value of the ``evaluate`` function,
         passed by the user. ``state`` is also user-defined.
-    allresults: 
+    allresults:
         All other results as an object array.
         Grid points that were not evaluated are None.
-    '''
-    
+    """
+
     # - Get shape of search grid
     # - Prepare an object array to save search results
     # - Start the search in the middle of this grid
     # - Get the initial parameters
     # - Evalute the performance at these parameters
-    gridshape = [*map(len,pargrid)]
-    NPARAMS   = len(gridshape)
-    results   = np.full(gridshape,None,dtype='object')
-    pari      = [size//2 for size in gridshape]
-    pars      = [pr[i] for pr,i in zip(pargrid,pari, strict=False)]
-    result0   = evaluate(pars,None)
+    gridshape = [*map(len, pargrid)]
+    NPARAMS = len(gridshape)
+    results = np.full(gridshape, None, dtype="object")
+    pari = [size // 2 for size in gridshape]
+    pars = [pr[i] for pr, i in zip(pargrid, pari, strict=False)]
+    result0 = evaluate(pars, None)
     state0, likelihood0, info0 = result0
 
     # Tell me which parameters were the best, so far
     def current_best():
         nonlocal results
         ll = np.array([-np.inf if r is None else r[1] for r in results.ravel()])
-        return np.unravel_index(np.argmax(ll),results.shape), np.max(ll)
+        return np.unravel_index(np.argmax(ll), results.shape), np.max(ll)
 
     # Bounds test for grid search
     def ingrid(ix):
-        return all([i>=0 and i<Ni for i,Ni in zip(ix,gridshape, strict=False)])
-    
+        return all([i >= 0 and i < Ni for i, Ni in zip(ix, gridshape, strict=False)])
+
     # Recursive grid search function
-    def search(index,suggested_direction=None):
+    def search(index, suggested_direction=None):
         nonlocal results
         index = tuple(index)
         # Do nothing if we're outside the grid or already evaluated this index
@@ -122,74 +119,85 @@ def grid_search(
             return
 
         # Compute result and save
-        pars            = [pr[i] for pr,i in zip(pargrid,index, strict=False)]
-        results[index]  = evaluate(pars,None,**opts)
+        pars = [pr[i] for pr, i in zip(pargrid, index, strict=False)]
+        results[index] = evaluate(pars, None, **opts)
         state, ll, info = results[index]
         if verbose:
-            print('\r[{}]({}) loss={:e}'.format(','.join([f'{i:d}' for i in index]),
-                 ','.join([f'{p:0.2e}' for p in pars]),ll),
-                  flush=True,end='')
+            print(
+                "\r[{}]({}) loss={:e}".format(
+                    ",".join([f"{i:d}" for i in index]),
+                    ",".join([f"{p:0.2e}" for p in pars]),
+                    ll,
+                ),
+                flush=True,
+                end="",
+            )
         # Figure out where to go next
         # - Try continuing in current direction first
         # - Recurse along all other directions until better parameters found
         Δs = set()
         for i in range(NPARAMS):
-            for d in [-1,1]:
-                Δ = np.zeros(NPARAMS,'int32')
+            for d in [-1, 1]:
+                Δ = np.zeros(NPARAMS, "int32")
                 Δ[i] += d
                 Δs.add(tuple(Δ))
         if suggested_direction is not None:
             Δ = suggested_direction
-            if current_best()[0]==index:
-                search(np.int32(index)+Δ,Δ)
+            if current_best()[0] == index:
+                search(np.int32(index) + Δ, Δ)
                 Δs -= {tuple(Δ)}
         for Δ in Δs:
-            if current_best()[0]!=index:
+            if current_best()[0] != index:
                 break
-            search(np.int32(index)+Δ,Δ)
+            search(np.int32(index) + Δ, Δ)
         return
-            
+
     search(pari)
     best = current_best()[0]
-    pars = [pr[i] for pr,i in zip(pargrid,best, strict=False)]
+    pars = [pr[i] for pr, i in zip(pargrid, best, strict=False)]
     if verbose:
-        print('(done)')
-    return GridsearchResult(best,pars,results[best],results,pargrid)
+        print("(done)")
+    return GridsearchResult(best, pars, results[best], results, pargrid)
 
 
-
-
-def optimize_PVtheta(N,K,prior_mean,P,V,
-    rp = 2 , # Range (ratio) to search for optimal period
-    rv = 10, # Range (ratio) to search for optimal kernel height
-    Np = 51, # Period search grid resolution
-    Nv = 51, # Kernel height search grid resolutions
-    Nθ = 60, # Angles to test
-    ):
+def optimize_PVtheta(
+    N,
+    K,
+    prior_mean,
+    P,
+    V,
+    rp=2,  # Range (ratio) to search for optimal period
+    rv=10,  # Range (ratio) to search for optimal kernel height
+    Np=51,  # Period search grid resolution
+    Nv=51,  # Kernel height search grid resolutions
+    Nθ=60,  # Angles to test
+):
     # Prepare hyperparameter grid
-    Ps = np.float32(np.exp(np.linspace(np.log(P/rp),np.log(P*rp),Np)))
-    Vs = np.float32(np.exp(np.linspace(np.log(V/rv),np.log(V*rv),Nv))[::-1])
-    θs = np.linspace(0,np.pi/3,Nθ+1)[:Nθ]
+    Ps = np.float32(np.exp(np.linspace(np.log(P / rp), np.log(P * rp), Np)))
+    Vs = np.float32(np.exp(np.linspace(np.log(V / rv), np.log(V * rv), Nv))[::-1])
+    θs = np.linspace(0, np.pi / 3, Nθ + 1)[:Nθ]
     # Period and variance
-    NKμ = (N,K,prior_mean)
+    NKμ = (N, K, prior_mean)
+
     def gcloss(pars, state):
-        P,V = pars
-        kf = kernelft(N.shape,P=P,V=V)
-        return lgcp2d(kf,*NKμ,initial_guess=state)[0]
-    (P,V),(zv,nll,(r,zm,vm,mu)) = grid_search([Ps,Vs],gcloss)[1:3]
+        P, V = pars
+        kf = kernelft(N.shape, P=P, V=V)
+        return lgcp2d(kf, *NKμ, initial_guess=state)[0]
+
+    (P, V), (zv, nll, (r, zm, vm, mu)) = grid_search([Ps, Vs], gcloss)[1:3]
     results = []
+
     # Angle
     def angle_helper(θi):
-        kernel = kernelft(N.shape,P=P,V=V,style='grid',angle=θi)
-        return lgcp2d(kernel,*NKμ)[0]
-    results = parmap(angle_helper,θs)
+        kernel = kernelft(N.shape, P=P, V=V, style="grid", angle=θi)
+        return lgcp2d(kernel, *NKμ)[0]
+
+    results = parmap(angle_helper, θs)
     allzv, nll, λv = zip(*results, strict=False)
     i = np.argmax(nll)
     θ = θs[i]
-    print('Optimized parameters:')
-    print(f'P = {P:f}')
-    print(f'V = {V:f}')
-    print(f'θ = {θ*180/np.pi:f}°')
+    print("Optimized parameters:")
+    print(f"P = {P:f}")
+    print(f"V = {V:f}")
+    print(f"θ = {θ * 180 / np.pi:f}°")
     return (P, V, θ), results[i]
-
-

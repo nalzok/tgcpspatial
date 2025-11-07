@@ -7,170 +7,168 @@ from scipy.special import j0, jn_zeros
 from .util import blur2d, c2p, p2c, zgrid
 
 
-def ensurePSD(kern,eps=0.0):
-    assert eps>=0
-    return ifftn(np.maximum(eps,fftn(kern).real)).real
+def ensurePSD(kern, eps=0.0):
+    assert eps >= 0
+    return ifftn(np.maximum(eps, fftn(kern).real)).real
+
 
 def grid_kernel(
     P,
     shape,
-    style      = 'radial',
-    angle      = 0.0,
-    doclip     = True,
-    k          = 3,
-    window     = 'square',
-    doblur     = True,
-    blurradius = None,
-    eps        = 1e-9,
-    ex         = (1,0),
-    ey         = (0,1),
-    normalize  = True
-    ):
-    '''
-    Generate a periodic grid kernel. 
+    style="radial",
+    angle=0.0,
+    doclip=True,
+    k=3,
+    window="square",
+    doblur=True,
+    blurradius=None,
+    eps=1e-9,
+    ex=(1, 0),
+    ey=(0, 1),
+    normalize=True,
+):
+    """
+    Generate a periodic grid kernel.
 
     The kernel is returned in the spatial domain, and
     shifted so that the (0,0) lag position is at array
-    location (0,0). You can use ``fftshift`` to move the 
+    location (0,0). You can use ``fftshift`` to move the
     zero index back to position ``shape//2``.
-    
+
     To construct oriented kernels, use the "grid", "band",
     or "square" style and specify the orientation ``angle``.
-    To add anisotropy or skew, provide two basis vectors 
-    ``e1`` and ``e2`` for the "horizontal" and "vertical" 
+    To add anisotropy or skew, provide two basis vectors
+    ``e1`` and ``e2`` for the "horizontal" and "vertical"
     components.
-    
+
     Parameters
     ----------
     P: float>0
         Grid cell period in units of bins. This is converted
         to a factor scale = 2π/P that multiplies the grid
-        indices to set the period. 
+        indices to set the period.
     W: int>1
         Grid width (or grid size, if ``H`` is not given)
-        
+
     Other Parameters
     ----------------
     H: int>1 or ``None`
         Grid height if different from ``W``.
     style: str; default 'radial'
-        Kernel style. 
+        Kernel style.
         - ``"radial"``: radially-symmetric, no orientation
         - ``"grid"``: hexagonal grid kernel
         - ``"band"``: a single plane wave
         - ``"square"``: two orthogonal plane waves
-        - ``"rbf"``: a radial basis function with σ²=½(P/π)² 
+        - ``"rbf"``: a radial basis function with σ²=½(P/π)²
             (matches grid-field size)
     angle: float, default None
         Grid orientation
     doclip: boolean; default True:
         Clip the resulting kernel to a local neighborhood?
     k: positive int; default 3
-        Bessel function zero to truncate the kernel at. 
+        Bessel function zero to truncate the kernel at.
         ``k=2``: inhibitory surround
         ``k=3``: nearest neighbor grid field
         ``k≥4``: Longer-range correlations
     window: str; default ``"parzen"''
-        Radial window function.  
+        Radial window function.
          - ``None``: No neighborhood windowing
          - ``"square"'': Square (i.e. disk) window
          - ``"parzen": Parzen window
          - ``"triangular": Triangular window
          - ``"gaussian": Gaussian window
     doblur: boolean; default True
-        Low-pass filter the resulting kernel? 
+        Low-pass filter the resulting kernel?
     eps: positive float; default 1e-5
         Minimum kernel eigenvalue.
     ex: 2-vector; default (1,0)
         Basis vector for "horizontal" direction.
     ey: 2-vector; default (0,1)
         Basis vector for "vertical" direction.
-    '''
-    if 'none' in str(window).lower():
+    """
+    if "none" in str(window).lower():
         window = None
-    if isinstance(shape,int):
-        shape = (shape,shape)
-    H,W   = shape
+    if isinstance(shape, int):
+        shape = (shape, shape)
+    H, W = shape
 
-    if P<2:
-        raise ValueError(f'Nyquist: P={P} cannot be <2 px')
-    
-    scale = 2*np.pi/P
-    B     = np.linalg.pinv([[*ex],[*ey]])
-    pxy   = zgrid(W,H)*(np.exp(1j*angle)*scale)
-    pxy   = p2c(np.einsum('ab,bwh->awh',B,c2p(pxy)))
-    r     = np.abs(pxy)
+    if P < 2:
+        raise ValueError(f"Nyquist: P={P} cannot be <2 px")
+
+    scale = 2 * np.pi / P
+    B = np.linalg.pinv([[*ex], [*ey]])
+    pxy = zgrid(W, H) * (np.exp(1j * angle) * scale)
+    pxy = p2c(np.einsum("ab,bwh->awh", B, c2p(pxy)))
+    r = np.abs(pxy)
 
     style = str(style).lower()
-    if style=='radial':
+    if style == "radial":
         kern = j0(r)
-    elif style=='grid':
+    elif style == "grid":
         component1 = np.cos(np.real(pxy))
-        component2 = np.cos(np.real(pxy*np.exp(1j*(np.pi/3))))
-        component3 = np.cos(np.real(pxy*np.exp(1j*(-np.pi/3))))
-        kern = component1 + component2 + component3  
-    elif style=='band':
+        component2 = np.cos(np.real(pxy * np.exp(1j * (np.pi / 3))))
+        component3 = np.cos(np.real(pxy * np.exp(1j * (-np.pi / 3))))
+        kern = component1 + component2 + component3
+    elif style == "band":
         kern = np.cos(np.real(pxy))
-    elif style=='square':
+    elif style == "square":
         component1 = np.cos(np.real(pxy))
-        component2 = np.cos(np.real(pxy*np.exp(1j*(np.pi/2))))
+        component2 = np.cos(np.real(pxy * np.exp(1j * (np.pi / 2))))
         kern = component1 + component2
-    elif style=='rbf':
-        kern = np.exp(-0.25*(r)**2)
+    elif style == "rbf":
+        kern = np.exp(-0.25 * (r) ** 2)
         doblur = False
-    else: 
-        raise ValueError(f'Style {str(style)} not implemented')
-    
+    else:
+        raise ValueError(f"Style {str(style)} not implemented")
+
     # Windowing to avoid ringing in FT
-    kern *= np.outer(np.hanning(H),np.hanning(W))
+    kern *= np.outer(np.hanning(H), np.hanning(W))
     kern = ifftshift(kern)
     r = ifftshift(r)
     # Local neighborhood window
     if doclip and not (k is None or window is None):
-        cutoff = jn_zeros(0,k)[-1]#/scale
-        if window=='gaussian':
-            sigma = cutoff/np.sqrt(2)
-            clip  = np.exp(-0.5*(r/sigma)**2)
-        elif window=='parzen':
-            disk  = r<cutoff/np.sqrt(2)
-            clip  = ifft2(fft2(disk)**4).real
-        elif window=='triangle':
-            disk  = r<cutoff
-            clip  = ifft2(fft2(disk)**2).real
-        elif window=='square':
-            clip  = r<cutoff
-        else: 
-            raise ValueError(f'Window {str(window)} not implemented')
+        cutoff = jn_zeros(0, k)[-1]  # /scale
+        if window == "gaussian":
+            sigma = cutoff / np.sqrt(2)
+            clip = np.exp(-0.5 * (r / sigma) ** 2)
+        elif window == "parzen":
+            disk = r < cutoff / np.sqrt(2)
+            clip = ifft2(fft2(disk) ** 4).real
+        elif window == "triangle":
+            disk = r < cutoff
+            clip = ifft2(fft2(disk) ** 2).real
+        elif window == "square":
+            clip = r < cutoff
+        else:
+            raise ValueError(f"Window {str(window)} not implemented")
         kern *= clip
 
     if doblur:
-        kern = blur2d(kern,(P/np.pi)/np.sqrt(2))
+        kern = blur2d(kern, (P / np.pi) / np.sqrt(2))
     if normalize:
-        kern = kern/np.max(kern)
-    kern = ensurePSD(kern,eps)
+        kern = kern / np.max(kern)
+    kern = ensurePSD(kern, eps)
     return kern
 
-def truncate(kf,wn=0.0,eth=0.1):
-    if np.size(kf)>1:
-        kept = kf >= np.max(kf.ravel()[1:])*eth
+
+def truncate(kf, wn=0.0, eth=0.1):
+    if np.size(kf) > 1:
+        kept = kf >= np.max(kf.ravel()[1:]) * eth
     else:
-        kept = np.full(kf.shape,True)
-    return (kf + wn)*kept
+        kept = np.full(kf.shape, True)
+    return (kf + wn) * kept
 
-def kernelft(shape,P=None,V=1.0,angle=0.0,dc=1e3,wn=0,eth=0.1,kept=None,**kw):
-    if isinstance(shape,int):
-        shape=(shape,shape)
+
+def kernelft(shape, P=None, V=1.0, angle=0.0, dc=1e3, wn=0, eth=0.1, kept=None, **kw):
+    if isinstance(shape, int):
+        shape = (shape, shape)
     shape = tuple([*shape])
-    k2 = grid_kernel(P,shape,angle=angle,**kw)*V
+    k2 = grid_kernel(P, shape, angle=angle, **kw) * V
     kf = fft2(k2).real
-    kf[0,0] += dc
-    if kept is None: 
-        return truncate(kf,wn,eth)
-    else: 
-        kept = np.float32(kept>0)
-        return (kf + wn)*kept
-
-
-
-
-
+    kf[0, 0] += dc
+    if kept is None:
+        return truncate(kf, wn, eth)
+    else:
+        kept = np.float32(kept > 0)
+        return (kf + wn) * kept
