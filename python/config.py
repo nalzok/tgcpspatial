@@ -9,7 +9,7 @@ import os, sys
 path = os.getcwd().split(os.sep)
 while len(path) and path[-1]!='notebooks': path = path[:-1]
 sys.path.append(os.sep.join(path[:-1]))
-datadir = os.sep.join(path[:-2]+['example data'])+os.sep
+datadir = os.sep.join(["krupic2018"])+os.sep
 datafiles = sorted([
     f for f in os.listdir(datadir) 
     if f.startswith('r') and f.endswith('.mat')])
