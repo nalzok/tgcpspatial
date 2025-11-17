@@ -15,7 +15,10 @@ path = os.getcwd().split(os.sep)
 while len(path) and path[-1] != "notebooks":
     path = path[:-1]
 sys.path.append(os.sep.join(path[:-1]))
-datadir = os.sep.join(["krupic2018"]) + os.sep
+
+# Make datadir relative to this config.py file location
+_config_dir = os.path.dirname(os.path.abspath(__file__))
+datadir = os.path.join(_config_dir, "krupic2018") + os.sep
 datafiles = sorted(
     [f for f in os.listdir(datadir) if f.startswith("r") and f.endswith(".mat")]
 )

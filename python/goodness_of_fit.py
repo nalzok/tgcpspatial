@@ -493,3 +493,49 @@ def compute_rescaled_isi_from_model(result, N, K, link):
             rescaled_isi.extend(intervals)
 
     return np.array(rescaled_isi)
+
+
+def compute_pearson_residuals(N, K, expected_rate):
+    """
+    Compute Pearson residuals for Poisson model.
+
+    Pearson residual = (observed - expected) / sqrt(expected)
+
+    Args:
+        N (ndarray): Occupancy
+        K (ndarray): Observed counts
+        expected_rate (ndarray): Expected rate
+
+    Returns:
+        ndarray: Pearson residuals at locations with data
+    """
+    mask = N > 0
+    observed = K[mask]
+    expected = (N * expected_rate)[mask]
+
+    residuals = (observed - expected) / np.sqrt(expected + 1e-10)
+    return residuals
+
+
+def compute_deviance_residuals(N, K, expected_rate):
+    """
+    Compute deviance residuals for Poisson model.
+
+    Args:
+        N (ndarray): Occupancy
+        K (ndarray): Observed counts
+        expected_rate (ndarray): Expected rate
+
+    Returns:
+        ndarray: Deviance residuals
+    """
+    mask = N > 0
+    y = K[mask]
+    mu = (N * expected_rate)[mask]
+
+    # Deviance residual
+    sign = np.sign(y - mu)
+    deviance = 2 * (y * np.log((y + 1e-10) / (mu + 1e-10)) - (y - mu))
+    residuals = sign * np.sqrt(np.abs(deviance))
+
+    return residuals

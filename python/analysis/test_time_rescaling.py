@@ -7,8 +7,14 @@ This script demonstrates how to use the time-rescaling theorem to validate
 different link functions for grid cell data.
 """
 
+import os
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
+
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import datadir
 from goodness_of_fit import (

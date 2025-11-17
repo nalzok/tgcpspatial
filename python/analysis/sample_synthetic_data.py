@@ -10,8 +10,14 @@ This script demonstrates forward simulation from LGCP models:
 4. Compare synthetic vs real data
 """
 
+import os
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
+
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import datadir
 from lgcp.data import Dataset
