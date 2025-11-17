@@ -224,6 +224,61 @@ class MyLink(LinkFunction):
 LINK_FUNCTIONS['mylink'] = MyLink
 ```
 
+## Evaluation Framework
+
+### Model Comparison
+
+The `evaluate_links.py` module provides comprehensive metrics for comparing link functions:
+
+```python
+from evaluate_links import compare_link_functions
+from lgcp.data import Dataset
+
+# Load data
+data = Dataset.from_file("data.mat").prepare()
+
+# Compare multiple link functions
+results = compare_link_functions(
+    data,
+    link_names=['exponential', 'relu', 'squared'],
+    test_fraction=0.2
+)
+```
+
+### Metrics Provided
+
+1. **ELBO (Evidence Lower Bound)** - Variational objective
+   - Higher is better
+   - Balances fit quality and model complexity
+
+2. **Train/Validation Log-Likelihood** - Predictive performance
+   - Train LL: Performance on training data
+   - Validation LL: Performance on held-out data (20%)
+   - Higher is better
+
+3. **Predictive Metrics**:
+   - MSE (Mean Squared Error) - Lower is better
+   - MAE (Mean Absolute Error) - Lower is better
+   - R² (Coefficient of Determination) - Higher is better
+   - Poisson Deviance - Lower is better
+
+### Running Evaluation
+
+Run the full evaluation pipeline:
+
+```bash
+uv run python run_evaluation.py
+```
+
+This generates:
+- Train/test split visualization
+- Performance metrics comparison
+- Rate map comparisons
+- Prediction scatter plots
+- Uncertainty vs. error analysis
+
+All figures are saved to the `figures/` directory.
+
 ## Testing
 
 Run the test suite:
