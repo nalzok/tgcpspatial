@@ -71,7 +71,7 @@ def get_hartley_components(mask):
     return rr.reshape(sh[0], int(np.prod(sh[1:])))
 
 
-def lgcpnd(kf, N, K, z0f, zh0, vh0, eps=1e-5, mintol=1e-5, maxcomponents=1000, **opts):
+def lgcpnd(kf, N, K, z0f, zh0, vh0, eps=1e-5, mintol=1e-5, maxcomponents=1000, link=None, **opts):
     """
     Args:
         kf (ndarray): ND kernel Fourier transform, unused
@@ -84,10 +84,15 @@ def lgcpnd(kf, N, K, z0f, zh0, vh0, eps=1e-5, mintol=1e-5, maxcomponents=1000, *
         eps (float, default 1e-3): Minimum prior eigenvalue
             (improves numerical conditioning)
         mintol (float, default 1e-5): Tolerance for MINRES
+        link: LinkFunction instance or None (default: ExponentialLink)
         **opts (dict): Options for ``coordinate_descent()``
     Returns:
         tuple: (InferResult,model)
     """
+    # Import link function
+    if link is None:
+        from nonlinearity import ExponentialLink
+        link = ExponentialLink()
     Y = sdiv(K, N)  # Empirical rate (pseudopoint rates)
     SHAPE = N.shape
     nmask = N > 0  # Mask where observations exist
@@ -164,12 +169,16 @@ def lgcpnd(kf, N, K, z0f, zh0, vh0, eps=1e-5, mintol=1e-5, maxcomponents=1000, *
     ll0 = 0.5 * (ldΣz - R)
 
     def _nr(uh, vh):
-        return nm * sexp(Ft(uh) + z0 + vh * 0.5)
+        """Compute expected rate: E[N * g(f)] where f ~ N(mu, v)"""
+        z = Ft(uh) + z0  # posterior mean at observed locations
+        return nm * link.expected_rate(z, vh)
 
     def loss(uh, vh):
-        z = Ft(uh) + z0
-        r = sexp(z + vh * 0.5)
-        nyr = nm @ (r - ym * z)  #  n'(λ-y∘μ)
+        z = Ft(uh) + z0  # posterior mean at observed locations
+        # Expected Poisson LL: E[K*log(λ) - N*λ]
+        E_rate = link.expected_rate(z, vh)
+        E_log_rate = link.expected_log_rate(z, vh)
+        nyr = nm @ E_rate - nym @ E_log_rate  # -E[Poisson LL]
         uΛu = ssum(uh**2 * Λh)  #  μ'Λ₀μ
         C = _C(uh, vh)
         trΛΣ = ssum(C**2 * Λh)  #  tr[Λ₀Σ]
@@ -177,17 +186,25 @@ def lgcpnd(kf, N, K, z0f, zh0, vh0, eps=1e-5, mintol=1e-5, maxcomponents=1000, *
         return ll0 + nyr + 0.5 * (uΛu + trΛΣ) - ldΣq
 
     def meanupdate(uh, vh):
-        nr = _nr(uh, vh)
+        z = Ft(uh) + z0  # posterior mean at observed locations
+        nr = _nr(uh, vh)  # E[N * λ]
+        grad_mu = link.expected_rate_gradient_mu(z, vh)  # d/dμ E[λ]
         J = Λh * uh + Fo(nr - nym)
 
         def Hu(u):
-            return Λh * u + Fo(nr * (Ft(u)))
+            # Hessian-vector product: uses gradient of expected rate
+            return Λh * u + Fo(nm * grad_mu * Ft(u))
 
         Hv = LinearOperator((R, R), Hu, Hu, dtype=np.float32)
         return -np.float32(minres(Hv, J, rtol=mintol, M=M)[0])
 
     def _C(uh, vh):  # Cholesky factor of covariance
-        x = np.sqrt(_nr(uh, vh))[None, :] * Fm
+        # For exponential link: Hessian diagonal = N*exp(f) = _nr
+        # For general link: Use gradient as approximation
+        z = Ft(uh) + z0
+        grad_mu = link.expected_rate_gradient_mu(z, vh)
+        # Use sqrt of weighted gradient for Cholesky factorization
+        x = np.sqrt(nm * grad_mu + 1e-10)[None, :] * Fm
         return chinv(np.diag(Λh) + x @ x.T)
 
     def varupdate(uh, vh):
@@ -195,12 +212,15 @@ def lgcpnd(kf, N, K, z0f, zh0, vh0, eps=1e-5, mintol=1e-5, maxcomponents=1000, *
 
     def unpack(uh, vh):
         """Unpack low-d mean, sparse marginal variance."""
-        x = np.sqrt(_nr(uh, vh), dtype="f")[None, :] * Fm
+        # Compute full posterior variance using gradient-based approximation
+        z_obs = Ft(uh) + z0
+        grad_mu_obs = link.expected_rate_gradient_mu(z_obs, vh)
+        x = np.sqrt(nm * grad_mu_obs + 1e-10, dtype="f")[None, :] * Fm
         C = chinv(np.diag(Λh) + x @ x.T)
         v = np.sum((Gm.T @ C) ** 2, 1, "f")  # Full posterior log-rate variance
         z = Gt(uh)  # full Δ mean-log-rate
         μ = z + z0f  # full posterior mean-log-rate
-        r = sexp(μ + v / 2)  # full posterior mean rate
+        r = link.expected_rate(μ, v)  # full posterior mean rate using link
         return ten(z), ten(r), ten(v), ten(μ)
 
     def sample(nsamples, uho=None, vho=None):
@@ -264,7 +284,7 @@ class ClosureObject(dict):
         return self[name]
 
 
-def lgcp2d(kf, N, K, prior_mean, initial_guess=(None, None), **opts):
+def lgcp2d(kf, N, K, prior_mean, initial_guess=(None, None), link=None, **opts):
     """
     Args:
         kf (ndarray): 2D kernel Fourier transform,
@@ -274,6 +294,7 @@ def lgcp2d(kf, N, K, prior_mean, initial_guess=(None, None), **opts):
         prior_mean (ndarray): prior log-rate mean
         initial_guess (tuple, optional): Tuple of the initial
             posterior log-mean and posterior log-marginal-variances
+        link: LinkFunction instance or None (default: ExponentialLink)
         **opts (dict): Keword arguments for ``lgcpnd()``
     Returns:
         tuple: (InferResult,model)
@@ -289,10 +310,10 @@ def lgcp2d(kf, N, K, prior_mean, initial_guess=(None, None), **opts):
     if vh0 is None:
         vh0 = np.zeros(np.size(N), "f")
     assert np.size(zh0) == np.size(vh0) == np.size(N)
-    return lgcpnd(kf, N, K, z0f, zh0, vh0, **opts)
+    return lgcpnd(kf, N, K, z0f, zh0, vh0, link=link, **opts)
 
 
-def lgcpheading(kf, N, K, prior_mean, initial_guess=(None, None), **opts):
+def lgcpheading(kf, N, K, prior_mean, initial_guess=(None, None), link=None, **opts):
     """
     Args:
         kf (ndarray): 3D kernel Fourier transform,
@@ -302,6 +323,7 @@ def lgcpheading(kf, N, K, prior_mean, initial_guess=(None, None), **opts):
         prior_mean (ndarray): prior log-rate mean
         initial_guess (tuple, optional): Tuple of the initial
             posterior log-mean and posterior log-marginal-variances
+        link: LinkFunction instance or None (default: ExponentialLink)
         **opts (dict): Keword arguments for ``lgcpnd()``
     Returns:
         tuple: (InferResult,model)
@@ -336,4 +358,4 @@ def lgcpheading(kf, N, K, prior_mean, initial_guess=(None, None), **opts):
         vhf = np.ravel(np.float32(vh0))
     else:
         assert 0
-    return lgcpnd(kf, N, K, z0f, zhf, vhf, **opts)
+    return lgcpnd(kf, N, K, z0f, zhf, vhf, link=link, **opts)

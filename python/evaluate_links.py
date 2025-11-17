@@ -253,15 +253,17 @@ def evaluate_link_function(
     # Create kernel
     kf = kernelft(data.shape, data.P, data.V, angle=data.angle, style="grid")
 
-    # Run inference on training data
-    # Note: Using standard lgcp2d which assumes exponential link
-    # For other links, would need modified inference
+    # Get link function
+    link = get_link_function(link_name)
+
+    # Run inference on training data with specified link
     result, model = lgcp2d(
         kf,
         N_train,
         K_train,
         data.prior_mean,
         (data.kdelograte, None),
+        link=link,
         verbose=verbose,
         **inference_opts,
     )

@@ -65,17 +65,19 @@ def plot_comparison_metrics(results, filename="figures/comparison_metrics.png"):
     """Plot comparison of different metrics across link functions."""
     fig, axes = plt.subplots(2, 3, figsize=(15, 8))
 
-    link_names = list(results.keys())
+    # Filter out failed evaluations
+    valid_results = {k: v for k, v in results.items() if v is not None}
+    link_names = list(valid_results.keys())
     colors = plt.cm.Set2(np.linspace(0, 1, len(link_names)))
 
     # Extract metrics
     metrics = {
-        "ELBO": [results[l]["elbo"] for l in link_names],
-        "Train LL": [results[l]["train_ll"] for l in link_names],
-        "Validation LL": [results[l]["validation_ll"] for l in link_names],
-        "MSE": [results[l].get("mse", 0) for l in link_names],
-        "R²": [results[l].get("r2", 0) for l in link_names],
-        "Deviance": [results[l].get("deviance", 0) for l in link_names],
+        "ELBO": [valid_results[l]["elbo"] for l in link_names],
+        "Train LL": [valid_results[l]["train_ll"] for l in link_names],
+        "Validation LL": [valid_results[l]["validation_ll"] for l in link_names],
+        "MSE": [valid_results[l].get("mse", 0) for l in link_names],
+        "R²": [valid_results[l].get("r2", 0) for l in link_names],
+        "Deviance": [valid_results[l].get("deviance", 0) for l in link_names],
     }
 
     # Plot each metric
@@ -122,13 +124,15 @@ def plot_comparison_metrics(results, filename="figures/comparison_metrics.png"):
 
 def plot_rate_map_comparison(data, results, filename="figures/rate_map_comparison.png"):
     """Plot rate maps from different link functions."""
-    n_links = len(results)
+    # Filter out failed evaluations
+    valid_results = {k: v for k, v in results.items() if v is not None}
+    n_links = len(valid_results)
     fig, axes = plt.subplots(1, n_links, figsize=(5 * n_links, 4))
 
     if n_links == 1:
         axes = [axes]
 
-    for idx, (link_name, result) in enumerate(results.items()):
+    for idx, (link_name, result) in enumerate(valid_results.items()):
         ax = axes[idx]
         plt.sca(ax)
 
@@ -151,13 +155,15 @@ def plot_rate_map_comparison(data, results, filename="figures/rate_map_compariso
 
 def plot_prediction_scatter(data, results, filename="figures/prediction_scatter.png"):
     """Scatter plot of predicted vs observed rates."""
-    n_links = len(results)
+    # Filter out failed evaluations
+    valid_results = {k: v for k, v in results.items() if v is not None}
+    n_links = len(valid_results)
     fig, axes = plt.subplots(1, n_links, figsize=(5 * n_links, 4))
 
     if n_links == 1:
         axes = [axes]
 
-    for idx, (link_name, result) in enumerate(results.items()):
+    for idx, (link_name, result) in enumerate(valid_results.items()):
         ax = axes[idx]
 
         # Get test data
@@ -202,13 +208,15 @@ def plot_prediction_scatter(data, results, filename="figures/prediction_scatter.
 
 def plot_uncertainty_vs_error(data, results, filename="figures/uncertainty_vs_error.png"):
     """Plot how prediction error relates to posterior uncertainty."""
-    n_links = len(results)
+    # Filter out failed evaluations
+    valid_results = {k: v for k, v in results.items() if v is not None}
+    n_links = len(valid_results)
     fig, axes = plt.subplots(1, n_links, figsize=(5 * n_links, 4))
 
     if n_links == 1:
         axes = [axes]
 
-    for idx, (link_name, result) in enumerate(results.items()):
+    for idx, (link_name, result) in enumerate(valid_results.items()):
         ax = axes[idx]
 
         # Get test data
@@ -264,9 +272,10 @@ def main():
     # Load data
     data = load_and_prepare_data("r2405_051216b_cell1816.mat")
 
-    # Note: Currently only exponential link is integrated with inference
-    # To test other links, would need to modify lgcp2d to accept link parameter
-    link_names = ["exponential"]
+    # Compare multiple link functions
+    # Note: ReLU has numerical integration which is slower
+    # Squared link currently has numerical stability issues
+    link_names = ["exponential", "relu"]
 
     # Run evaluation
     print("\n" + "=" * 80)
