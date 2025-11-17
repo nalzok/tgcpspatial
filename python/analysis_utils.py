@@ -158,6 +158,22 @@ def evaluate_model_complete(
             result, N_test, K_test, test_mask, link_name
         )
 
+        # Compute validation log-likelihood
+        mu_test = mu[test_mask]
+        v_test = v[test_mask]
+        N_test_vals = N_test[test_mask]
+        K_test_vals = K_test[test_mask]
+
+        E_rate_test = link.expected_rate(mu_test, v_test)
+        E_log_rate_test = link.expected_log_rate(mu_test, v_test)
+
+        from scipy.special import gammaln
+        val_ll = np.sum(
+            K_test_vals * (np.log(N_test_vals + 1e-10) + E_log_rate_test) -
+            N_test_vals * E_rate_test -
+            gammaln(K_test_vals + 1)
+        )
+
         # Residuals
         pearson_res = compute_pearson_residuals(data.N, data.K, expected_rate)
         deviance_res = compute_deviance_residuals(data.N, data.K, expected_rate)
@@ -185,6 +201,8 @@ def evaluate_model_complete(
             "result": result,
             "model": model,
             "train_ll": result.ll,
+            "elbo": result.ll,  # ELBO is the training log-likelihood
+            "val_ll": val_ll,
             "n_test": pred_metrics.get("n_test", 0),
             "mse": pred_metrics.get("mse", np.nan),
             "mae": pred_metrics.get("mae", np.nan),
@@ -293,24 +311,23 @@ def print_summary_table(results_dict):
     Args:
         results_dict (dict): Dict mapping link names to results
     """
-    print("\n" + "=" * 90)
+    print("\n" + "=" * 100)
     print("Model Comparison Summary")
-    print("=" * 90)
+    print("=" * 100)
     print(
-        f"{'Link':<15} {'Train LL':>10} {'R²':>8} {'MSE':>10} "
-        f"{'Pearson μ':>10} {'KS p-val':>10}"
+        f"{'Link':<15} {'ELBO':>10} {'Val LL':>10} {'R²':>8} {'MSE':>10} {'KS p-val':>10}"
     )
-    print("-" * 90)
+    print("-" * 100)
 
     for link_name, result in results_dict.items():
         if not result.get("success", False):
             print(f"{link_name:<15} {'ERROR':>10}")
             continue
 
-        train_ll = result.get("train_ll", np.nan)
+        elbo = result.get("elbo", np.nan)
+        val_ll = result.get("val_ll", np.nan)
         r2 = result.get("r2", np.nan)
         mse = result.get("mse", np.nan)
-        pearson_mean = result.get("pearson_res_mean", np.nan)
 
         # Get KS p-value if available
         gof = result.get("gof")
@@ -320,8 +337,7 @@ def print_summary_table(results_dict):
             ks_pval = np.nan
 
         print(
-            f"{link_name:<15} {train_ll:>10.1f} {r2:>8.3f} {mse:>10.5f} "
-            f"{pearson_mean:>10.3f} {ks_pval:>10.4f}"
+            f"{link_name:<15} {elbo:>10.1f} {val_ll:>10.1f} {r2:>8.3f} {mse:>10.5f} {ks_pval:>10.4f}"
         )
 
-    print("=" * 90)
+    print("=" * 100)

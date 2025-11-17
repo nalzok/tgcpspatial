@@ -66,7 +66,8 @@ def analyze_single_dataset(filename, link_names, output_dir="results"):
         results[link_name] = result
 
         if result.get("success", False):
-            print(f"    Train LL: {result['train_ll']:.2f}")
+            print(f"    ELBO: {result['elbo']:.2f}")
+            print(f"    Val LL: {result['val_ll']:.2f}")
             print(f"    R²: {result['r2']:.3f}")
             print(f"    MSE: {result['mse']:.5f}")
 
@@ -101,7 +102,7 @@ def plot_rate_maps(data, results_dict, output_dir, dataset_name):
         rate_map = result["result"].info.r
         data.arena.imshow(rate_map, lw=3, domask=True)
         ax.set_title(
-            f"{link_name}\nLL={result['train_ll']:.0f}, R²={result['r2']:.2f}",
+            f"{link_name}\nELBO={result['elbo']:.0f}, Val LL={result['val_ll']:.0f}\nR²={result['r2']:.2f}",
             fontsize=10,
             fontweight="bold",
         )
@@ -283,11 +284,11 @@ def main():
     print(f"\nFound {len(datasets)} datasets")
 
     # Link functions to test
-    link_names = ["exponential", "relu"]
+    link_names = ["exponential", "relu", "squared"]
     print(f"Testing link functions: {', '.join(link_names)}")
 
     # Create output directory
-    output_dir = "results"
+    output_dir = "../figures"
     os.makedirs(output_dir, exist_ok=True)
 
     # Analyze each dataset
